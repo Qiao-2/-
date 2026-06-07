@@ -78,6 +78,7 @@ function initTheme() { applyTheme(localStorage.getItem(THEME_KEY) || 'dark'); }
 function applyReaderPrefs() { const fontSize = Number(localStorage.getItem(FONT_SIZE_KEY) || 16); const lineHeight = Number(localStorage.getItem(LINE_HEIGHT_KEY) || 1.95); document.documentElement.style.setProperty('--reader-font-size', `${fontSize}px`); document.documentElement.style.setProperty('--reader-line-height', String(lineHeight)); els.fontSizeRange.value = String(fontSize); els.lineHeightRange.value = String(lineHeight); }
 function loadBooksFromSource() { return fetch(BOOKS_URL, { cache: 'no-store' }).then((res) => { if (!res.ok) throw new Error(`无法加载 ${BOOKS_URL}`); return res.json(); }).catch(() => defaultBooks); }
 function renderAll() { updateStats(); renderCategoryFilter(); renderBooks(state.filteredBooks); renderReader(); renderFavorites(); renderFeatured(); renderRecent(); syncAdminUI(); renderAdminBooks(); }
+function openAdminPanel() { const adminSection = document.getElementById('admin'); if (adminSection) adminSection.classList.remove('hidden'); if (!state.adminUnlocked) unlockAdmin(); }
 function switchFeatured(step) { const currentIndex = books.findIndex((book) => book.id === state.currentBookId); const nextIndex = (currentIndex + step + books.length) % books.length; state.currentBookId = books[nextIndex].id; const progress = loadProgress(state.currentBookId); state.currentChapterIndex = progress.chapterIndex ?? 0; state.currentPageIndex = progress.pageIndex ?? 0; pushRecent(state.currentBookId); renderAll(); }
 function syncAdminUI() { els.adminLocked.classList.toggle('hidden', state.adminUnlocked); els.adminPanel.classList.toggle('hidden', !state.adminUnlocked); els.jsonEditor.value = JSON.stringify(books, null, 2); if (state.adminUnlocked) applySiteMeta(); }
 function unlockAdmin() { const pwd = prompt('请输入后台密码'); if (pwd === null) return; if (pwd === ADMIN_PASSWORD) { state.adminUnlocked = true; localStorage.setItem(ADMIN_KEY, '1'); syncAdminUI(); } else alert('密码错误'); }
@@ -107,6 +108,12 @@ els.saveJsonBtn.addEventListener('click', saveJson);
 els.downloadJsonBtn.addEventListener('click', downloadJson);
 els.addBookBtn.addEventListener('click', addBook);
 els.saveSiteMetaBtn.addEventListener('click', saveSiteMetaFromForm);
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.altKey && (e.key === 'b' || e.key === 'B')) {
+    e.preventDefault();
+    openAdminPanel();
+  }
+});
 
 (async () => {
   books = await loadBooksFromSource();
