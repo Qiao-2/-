@@ -87,12 +87,21 @@
       <section class="toolbar glass" id="library">
         <div>
           <h3>作品书库</h3>
-          <p>搜索书名、作者、标签或分类</p>
+          <p>搜索书名、作者、标签、分类，或直接筛选资源类型</p>
         </div>
         <div class="toolbar-actions">
-          <label class="searchbox"><input id="searchInput" type="search" placeholder="例如：爱情 / 科幻 / 归人" /></label>
+          <label class="searchbox"><input id="searchInput" type="search" placeholder="例如：爱情 / 科幻 / 蓝奏云" /></label>
           <select id="categoryFilter" aria-label="分类筛选"><option value="all">全部分类</option></select>
+          <select id="resourceFilter" aria-label="资源筛选"><option value="all">全部资源</option><option value="with-link">有下载链接</option><option value="without-link">无下载链接</option></select>
         </div>
+      </section>
+
+      <section class="tag-panel glass">
+        <div class="tag-panel-head">
+          <h3>热门标签</h3>
+          <p>点击标签可快速筛选作品</p>
+        </div>
+        <div id="tagCloud" class="tag-cloud"></div>
       </section>
 
       <section class="library-grid" id="bookList"></section>
@@ -187,6 +196,8 @@
               <input id="newAuthor" placeholder="作者" />
               <input id="newCategory" placeholder="分类" />
               <input id="newTags" placeholder="标签，逗号分隔" />
+              <input id="newResourceUrl" placeholder="资源链接（你的蓝奏云直链）" />
+              <input id="newResourceLabel" placeholder="链接按钮文字，例如 蓝奏云下载" />
               <textarea id="newSummary" placeholder="简介"></textarea>
               <input id="newColor" placeholder="封面渐变，例如 linear-gradient(...)" />
               <textarea id="newChapters" placeholder="章节格式：标题||内容，每行一章"></textarea>

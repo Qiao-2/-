@@ -6,6 +6,8 @@
     "category": "现代",
     "tags": ["爱情", "都市", "完结"],
     "summary": "一部关于重逢、成长与选择的温柔故事。",
+    "resourceUrl": "https://example.com/your-lanzou-link-1",
+    "resourceLabel": "蓝奏云下载",
     "color": "linear-gradient(135deg, #fb7185, #a855f7)",
     "chapters": [
       {
@@ -33,6 +35,8 @@
     "category": "古风",
     "tags": ["历史", "权谋", "公版风格"],
     "summary": "以古城为背景的悬疑与人情故事。",
+    "resourceUrl": "https://example.com/your-lanzou-link-2",
+    "resourceLabel": "蓝奏云下载",
     "color": "linear-gradient(135deg, #f97316, #f43f5e)",
     "chapters": [
       {
@@ -60,6 +64,8 @@
     "category": "科幻",
     "tags": ["冒险", "未来", "连载"],
     "summary": "在星际航路上递送信件的人，见证了无数人的告别与希望。",
+    "resourceUrl": "https://example.com/your-lanzou-link-3",
+    "resourceLabel": "蓝奏云下载",
     "color": "linear-gradient(135deg, #38bdf8, #6366f1)",
     "chapters": [
       {
@@ -87,6 +93,8 @@
     "category": "治愈",
     "tags": ["成长", "校园", "短篇"],
     "summary": "一部温暖安静的治愈向作品。",
+    "resourceUrl": "https://example.com/your-lanzou-link-4",
+    "resourceLabel": "蓝奏云下载",
     "color": "linear-gradient(135deg, #22c55e, #14b8a6)",
     "chapters": [
       {
