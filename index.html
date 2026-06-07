@@ -3,71 +3,88 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>番茄阅读器 Pro - 合法阅读与下载</title>
-    <meta name="description" content="一个适合 GitHub Pages 部署的高级阅读器模板，使用独立 books.json 数据源，支持私密后台、收藏、最近阅读和 TXT 导出。仅用于你拥有授权或公版内容。" />
-    <meta name="theme-color" content="#0f172a" />
+    <title>会员专属个人站</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main id="home" class="minimal-home">
-      <section class="search-only glass">
-        <div>
-          <h1 id="siteHeroTitle">个人合法资源库</h1>
-          <p id="siteHeroDesc">只保留一个搜索栏，搜索你的资源标题、作者、标签或蓝奏云链接。</p>
+    <main class="page">
+      <section class="hero-card">
+        <div class="hero-left">
+          <h1>会员专属个人站</h1>
+          <p>请勿外传</p>
         </div>
-        <label class="searchbox search-only-box">
-          <input id="searchInput" type="search" placeholder="搜索资源 / 作者 / 标签 / 蓝奏云链接" />
-        </label>
-        <div class="search-actions">
-          <button class="btn secondary" id="unlockAdminBtn" type="button">后台</button>
+        <div class="hero-note">为了能够长久，请别外传，别炫耀，一经发现，将关停网站</div>
+        <button class="admin-pill" id="unlockAdminBtn" type="button">后台</button>
+      </section>
+
+      <section class="search-card">
+        <div class="search-row">
+          <input id="searchInput" type="search" placeholder="作者/书名" />
+          <button id="searchBtn" type="button">搜索</button>
         </div>
       </section>
 
-      <section class="library-grid minimal-results" id="bookList"></section>
+      <section id="bookList" class="results"></section>
 
-      <section class="admin-wrap glass" id="admin">
-        <div class="section-head">
+      <section class="admin-wrap hidden" id="admin">
+        <div class="admin-header">
           <div>
-            <h3 id="adminTitle">后台</h3>
-            <p>仅用于管理你自己的合法资源。</p>
+            <h2>后台管理</h2>
+            <p>输入密码后进入编辑面板，保存后前台会立即读取最新数据（当前浏览器）</p>
           </div>
-          <div class="admin-actions">
-            <button class="btn secondary" id="lockAdminBtn" type="button">锁定后台</button>
-          </div>
+          <button id="lockAdminBtn" type="button">锁定后台</button>
         </div>
+
         <div class="admin-locked" id="adminLocked">
-          <p>后台已锁定。点击“后台”并输入密码后，才能编辑数据。</p>
+          <div class="admin-row">
+            <input id="adminPasswordInput" type="password" placeholder="请输入后台密码" />
+            <button id="submitAdminPasswordBtn" type="button">解锁后台</button>
+          </div>
         </div>
-        <div id="adminPanel" class="hidden admin-grid">
-          <section class="inner-panel glass-inner">
-            <h4>快速编辑</h4>
-            <div class="form-grid">
+
+        <div id="adminPanel" class="hidden admin-panel">
+          <section class="panel-block">
+            <h3>快速新增</h3>
+            <div class="admin-row grid">
               <input id="newTitle" placeholder="书名" />
               <input id="newAuthor" placeholder="作者" />
               <input id="newResourceUrl" placeholder="蓝奏云链接填写" />
               <input id="newResourceLabel" placeholder="按钮文字" />
             </div>
             <div class="admin-actions">
-              <button class="btn primary small" id="addBookBtn" type="button">添加</button>
-              <button class="btn secondary small" id="saveJsonBtn" type="button">保存</button>
-              <button class="btn secondary small" id="downloadJsonBtn" type="button">导出 JSON</button>
+              <button id="addBookBtn" type="button">添加</button>
+              <button id="saveJsonBtn" type="button">保存</button>
+              <button id="downloadJsonBtn" type="button">导出 JSON</button>
             </div>
           </section>
-          <section class="inner-panel glass-inner">
-            <h4>资源列表</h4>
+
+          <section class="panel-block">
+            <h3>资源列表</h3>
             <div class="admin-actions">
-              <button class="btn secondary small" id="selectAllAdminBtn" type="button">全选</button>
-              <button class="btn secondary small" id="clearSelectionBtn" type="button">清空</button>
-              <button class="btn secondary small" id="deleteSelectedBtn" type="button">删除</button>
+              <button id="selectAllAdminBtn" type="button">全选</button>
+              <button id="clearSelectionBtn" type="button">清空</button>
+              <button id="deleteSelectedBtn" type="button">删除</button>
             </div>
-            <div id="adminBookList" class="recent-list"></div>
+            <div id="adminBookList" class="results"></div>
           </section>
         </div>
       </section>
     </main>
+
+    <dialog id="passwordDialog" class="password-dialog">
+      <form method="dialog" class="password-card" id="passwordForm">
+        <h3>后台验证</h3>
+        <p>请输入密码后进入后台。</p>
+        <input id="dialogPasswordInput" type="password" placeholder="请输入后台密码" />
+        <div class="admin-actions">
+          <button id="dialogCancelBtn" value="cancel" type="button">取消</button>
+          <button id="dialogSubmitBtn" value="default" type="button">确认</button>
+        </div>
+      </form>
+    </dialog>
 
     <footer class="footer"><p>仅用于合法内容展示与下载。</p></footer>
     <script src="script.js"></script>
