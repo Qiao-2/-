@@ -12,17 +12,16 @@
   <body>
     <main class="page">
       <section class="hero-card">
-        <div class="hero-left">
-          <h1>会员专属个人站</h1>
-          <p>请勿外传</p>
+        <div class="hero-copy">
+          <h1 id="siteHeroTitle">会员专属个人站</h1>
+          <p id="siteHeroDesc">请勿外传</p>
         </div>
-        <div class="hero-note">为了能够长久，请别外传，别炫耀，一经发现，将关停网站</div>
-        <button class="admin-pill" id="unlockAdminBtn" type="button">后台</button>
+        <button class="admin-btn" id="unlockAdminBtn" type="button">后台</button>
       </section>
 
       <section class="search-card">
         <div class="search-row">
-          <input id="searchInput" type="search" placeholder="作者/书名" />
+          <input id="searchInput" type="search" placeholder="作者 / 书名" />
           <button id="searchBtn" type="button">搜索</button>
         </div>
       </section>
@@ -30,63 +29,55 @@
       <section id="bookList" class="results"></section>
 
       <section class="admin-wrap hidden" id="admin">
-        <div class="admin-header">
-          <div>
-            <h2>后台管理</h2>
-            <p>输入密码后进入编辑面板，保存后前台会立即读取最新数据（当前浏览器）</p>
-          </div>
-          <button id="lockAdminBtn" type="button">锁定后台</button>
-        </div>
-
         <div class="admin-locked" id="adminLocked">
-          <div class="admin-row">
+          <p>后台已锁定。输入密码后即可解锁并显示在页面下方。</p>
+          <div class="password-row">
             <input id="adminPasswordInput" type="password" placeholder="请输入后台密码" />
             <button id="submitAdminPasswordBtn" type="button">解锁后台</button>
           </div>
         </div>
 
         <div id="adminPanel" class="hidden admin-panel">
-          <section class="panel-block">
-            <h3>快速新增</h3>
-            <div class="admin-row grid">
+          <div class="admin-block">
+            <h3>快速编辑</h3>
+            <div class="grid-2">
               <input id="newTitle" placeholder="书名" />
               <input id="newAuthor" placeholder="作者" />
               <input id="newResourceUrl" placeholder="蓝奏云链接填写" />
               <input id="newResourceLabel" placeholder="按钮文字" />
             </div>
-            <div class="admin-actions">
+            <div class="actions">
               <button id="addBookBtn" type="button">添加</button>
               <button id="saveJsonBtn" type="button">保存</button>
               <button id="downloadJsonBtn" type="button">导出 JSON</button>
             </div>
-          </section>
+          </div>
 
-          <section class="panel-block">
-            <h3>资源列表</h3>
-            <div class="admin-actions">
+          <div class="admin-block">
+            <h3>批量管理</h3>
+            <div class="actions">
               <button id="selectAllAdminBtn" type="button">全选</button>
               <button id="clearSelectionBtn" type="button">清空</button>
               <button id="deleteSelectedBtn" type="button">删除</button>
             </div>
             <div id="adminBookList" class="results"></div>
-          </section>
+          </div>
         </div>
       </section>
     </main>
 
     <dialog id="passwordDialog" class="password-dialog">
-      <form method="dialog" class="password-card" id="passwordForm">
-        <h3>后台验证</h3>
-        <p>请输入密码后进入后台。</p>
+      <div class="password-card">
+        <h3>后台解锁</h3>
+        <p>请输入密码后继续。</p>
         <input id="dialogPasswordInput" type="password" placeholder="请输入后台密码" />
-        <div class="admin-actions">
-          <button id="dialogCancelBtn" value="cancel" type="button">取消</button>
-          <button id="dialogSubmitBtn" value="default" type="button">确认</button>
+        <div class="actions right">
+          <button id="dialogCancelBtn" type="button">取消</button>
+          <button id="dialogSubmitBtn" type="button">确认</button>
         </div>
-      </form>
+      </div>
     </dialog>
 
-    <footer class="footer"><p>仅用于合法内容展示与下载。</p></footer>
     <script src="script.js"></script>
   </body>
 </html>
