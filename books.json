@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "title": "春夜归人",
+    "author": "林知夏",
+    "resourceUrl": "https://example.com/your-lanzou-link-1",
+    "resourceLabel": "蓝奏云链接填写"
+  },
+  {
+    "id": 2,
+    "title": "长安灯火",
+    "author": "沈砚",
+    "resourceUrl": "https://example.com/your-lanzou-link-2",
+    "resourceLabel": "蓝奏云链接填写"
+  },
+  {
+    "id": 3,
+    "title": "星海邮差",
+    "author": "顾北",
+    "resourceUrl": "https://example.com/your-lanzou-link-3",
+    "resourceLabel": "蓝奏云链接填写"
+  }
+]

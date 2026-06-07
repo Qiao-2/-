@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>会员专属个人站</title>
+    <meta name="theme-color" content="#f5d9ea" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -11,35 +12,50 @@
   </head>
   <body>
     <main class="page">
-      <section class="hero-card">
-        <div class="hero-copy">
-          <h1 id="siteHeroTitle">会员专属个人站</h1>
-          <p id="siteHeroDesc">请勿外传</p>
+      <section class="hero-shell">
+        <div class="hero-title-box">
+          <h1>会员专属个人站</h1>
+          <p>请勿外传</p>
         </div>
-        <button class="admin-btn" id="unlockAdminBtn" type="button">后台</button>
+
+        <div class="hero-warning-box">
+          为了能够长久，请别外传，别炫耀，一经发现，将关停网站
+        </div>
+
+        <button class="admin-vert-btn" id="unlockAdminBtn" type="button">后台</button>
       </section>
 
-      <section class="search-card">
+      <section class="search-shell">
         <div class="search-row">
-          <input id="searchInput" type="search" placeholder="作者 / 书名" />
+          <input id="searchInput" type="search" placeholder="作者/书名" />
+        </div>
+        <div class="search-actions">
           <button id="searchBtn" type="button">搜索</button>
         </div>
       </section>
 
-      <section id="bookList" class="results"></section>
+      <section class="results-shell" id="bookList"></section>
 
-      <section class="admin-wrap hidden" id="admin">
+      <section class="admin-shell hidden" id="admin">
+        <div class="admin-header">
+          <div>
+            <h2>后台</h2>
+            <p>仅用于管理你自己的合法资源。</p>
+          </div>
+          <button class="lock-btn" id="lockAdminBtn" type="button">锁定</button>
+        </div>
+
         <div class="admin-locked" id="adminLocked">
-          <p>后台已锁定。输入密码后即可解锁并显示在页面下方。</p>
+          <p>后台已锁定。请输入密码后即可解锁。</p>
           <div class="password-row">
             <input id="adminPasswordInput" type="password" placeholder="请输入后台密码" />
             <button id="submitAdminPasswordBtn" type="button">解锁后台</button>
           </div>
         </div>
 
-        <div id="adminPanel" class="hidden admin-panel">
-          <div class="admin-block">
-            <h3>快速编辑</h3>
+        <div class="admin-panel hidden" id="adminPanel">
+          <section class="admin-block">
+            <h3>快速新增</h3>
             <div class="grid-2">
               <input id="newTitle" placeholder="书名" />
               <input id="newAuthor" placeholder="作者" />
@@ -51,33 +67,36 @@
               <button id="saveJsonBtn" type="button">保存</button>
               <button id="downloadJsonBtn" type="button">导出 JSON</button>
             </div>
-          </div>
+          </section>
 
-          <div class="admin-block">
-            <h3>批量管理</h3>
-            <div class="actions">
-              <button id="selectAllAdminBtn" type="button">全选</button>
-              <button id="clearSelectionBtn" type="button">清空</button>
-              <button id="deleteSelectedBtn" type="button">删除</button>
+          <section class="admin-block">
+            <div class="admin-header">
+              <h3>资源列表</h3>
+              <div class="actions right">
+                <button id="selectAllAdminBtn" type="button">全选</button>
+                <button id="clearSelectionBtn" type="button">清空</button>
+                <button id="deleteSelectedBtn" type="button">删除</button>
+              </div>
             </div>
             <div id="adminBookList" class="results"></div>
-          </div>
+          </section>
         </div>
       </section>
     </main>
 
     <dialog id="passwordDialog" class="password-dialog">
       <div class="password-card">
-        <h3>后台解锁</h3>
-        <p>请输入密码后继续。</p>
-        <input id="dialogPasswordInput" type="password" placeholder="请输入后台密码" />
-        <div class="actions right">
-          <button id="dialogCancelBtn" type="button">取消</button>
+        <h3>输入后台密码</h3>
+        <p>输入正确后，后台才会出现在页面最下面。</p>
+        <div class="password-row">
+          <input id="dialogPasswordInput" type="password" placeholder="请输入密码" />
           <button id="dialogSubmitBtn" type="button">确认</button>
+          <button id="dialogCancelBtn" type="button">取消</button>
         </div>
       </div>
     </dialog>
 
+    <footer class="footer">仅用于合法内容展示与下载。</footer>
     <script src="script.js"></script>
   </body>
 </html>

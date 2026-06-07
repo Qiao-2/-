@@ -11,6 +11,7 @@ const els = {
   searchBtn: document.getElementById('searchBtn'),
   bookList: document.getElementById('bookList'),
   unlockAdminBtn: document.getElementById('unlockAdminBtn'),
+  lockAdminBtn: document.getElementById('lockAdminBtn'),
   admin: document.getElementById('admin'),
   adminLocked: document.getElementById('adminLocked'),
   adminPanel: document.getElementById('adminPanel'),
@@ -43,28 +44,7 @@ function loadBooksFromSource() {
     .catch(() => []);
 }
 
-function searchQuery() {
-  return els.searchInput.value.trim().toLowerCase();
-}
-
-function renderBooks(list) {
-  els.bookList.innerHTML = list.length
-    ? list.map((book) => `
-      <article class="result-item" data-id="${book.id}">
-        <h3>${book.title}</h3>
-        <p>作者 / ${book.author}</p>
-        ${book.resourceUrl ? `<p><a href="${book.resourceUrl}" target="_blank" rel="noopener noreferrer">${book.resourceLabel || '蓝奏云链接填写'}</a></p>` : ''}
-      </article>`).join('')
-    : '<div class="result-item"><p>没有找到内容</p></div>';
-}
-
-function filterBooks() {
-  const q = searchQuery();
-  const filtered = books.filter((book) => [book.title, book.author, book.resourceUrl || '', book.resourceLabel || ''].join(' ').toLowerCase().includes(q));
-  renderBooks(filtered);
-}
-
-function showAdminPanel() {
+function showAdminShell() {
   els.admin.classList.remove('hidden');
   els.admin.scrollIntoView({ behavior: 'smooth', block: 'start' });
   els.adminLocked.classList.remove('hidden');
@@ -72,7 +52,7 @@ function showAdminPanel() {
 }
 
 function openPasswordDialog() {
-  showAdminPanel();
+  showAdminShell();
   if (els.passwordDialog?.showModal) {
     els.dialogPasswordInput.value = '';
     els.passwordDialog.showModal();
@@ -99,6 +79,27 @@ function lockAdmin() {
   selectedIds = [];
   els.adminPanel.classList.add('hidden');
   els.adminLocked.classList.remove('hidden');
+}
+
+function searchQuery() {
+  return els.searchInput.value.trim().toLowerCase();
+}
+
+function renderBooks(list) {
+  els.bookList.innerHTML = list.length
+    ? list.map((book) => `
+      <article class="result-item" data-id="${book.id}">
+        <h3>${book.title}</h3>
+        <p>作者 / ${book.author}</p>
+        ${book.resourceUrl ? `<p><a href="${book.resourceUrl}" target="_blank" rel="noopener noreferrer">${book.resourceLabel || '蓝奏云链接填写'}</a></p>` : ''}
+      </article>`).join('')
+    : '';
+}
+
+function filterBooks() {
+  const q = searchQuery();
+  const filtered = books.filter((book) => [book.title, book.author, book.resourceUrl || '', book.resourceLabel || ''].join(' ').toLowerCase().includes(q));
+  renderBooks(filtered);
 }
 
 function renderAdminBooks() {
