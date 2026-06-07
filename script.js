@@ -3,14 +3,19 @@ const SUPABASE_URL = 'https://kbiwuphjvejhogxhzdug.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_HYSdxuODVwR6GKlla7fcMg_o0h8-aJ6';
 const TABLE_NAME = 'resources';
 const ADMIN_KEY = 'novel_admin_unlocked';
+const SEARCH_DEBOUNCE_MS = 220;
 
 let selectedIds = [];
 let supabaseClient = null;
 let books = [];
+let searchTimer = null;
+let searchSeq = 0;
+let lastQuery = '';
 
 const els = {
   searchInput: document.getElementById('searchInput'),
   searchBtn: document.getElementById('searchBtn'),
+  searchStatus: document.getElementById('searchStatus'),
   bookList: document.getElementById('bookList'),
   unlockAdminBtn: document.getElementById('unlockAdminBtn'),
   admin: document.getElementById('admin'),
@@ -34,6 +39,15 @@ const els = {
   adminBookList: document.getElementById('adminBookList'),
 };
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function getSupabaseClient() {
   if (supabaseClient) return supabaseClient;
   if (!window.supabase) throw new Error('Supabase 客户端未加载');
@@ -41,33 +55,81 @@ function getSupabaseClient() {
   return supabaseClient;
 }
 
-async function loadBooksFromSupabase() {
-  const client = getSupabaseClient();
-  const { data, error } = await client.from(TABLE_NAME).select('*').order('created_at', { ascending: false });
-  if (error) throw error;
-  books = (data || []).map((item) => ({
+function normalizeBook(item) {
+  return {
     id: item.id,
     title: item.title || '',
     author: item.author || '',
-    resourceUrl: item.resource_url || '',
-    resourceLabel: item.resource_label || '蓝奏云链接填写',
-  }));
+    resourceUrl: item.resource_url || item.resourceUrl || '',
+    resourceLabel: item.resource_label || item.resourceLabel || '蓝奏云链接填写',
+  };
 }
 
-function searchQuery() {
-  return els.searchInput.value.trim().toLowerCase();
+async function loadBooksFromSupabase(query = '') {
+  const client = getSupabaseClient();
+  let request = client.from(TABLE_NAME).select('*').order('created_at', { ascending: false });
+
+  const q = query.trim();
+  if (q) {
+    const pattern = `%${q}%`;
+    request = request.or([
+      `title.ilike.${pattern}`,
+      `author.ilike.${pattern}`,
+      `resource_url.ilike.${pattern}`,
+      `resource_label.ilike.${pattern}`,
+    ].join(','));
+  }
+
+  const { data, error } = await request;
+  if (error) throw error;
+  books = (data || []).map(normalizeBook);
+  return books;
 }
 
-function renderBooks(list) {
+function setSearchStatus(message) {
+  if (els.searchStatus) els.searchStatus.textContent = message;
+}
+
+function currentQuery() {
+  return els.searchInput.value.trim();
+}
+
+function renderBooks(list, query = '') {
+  const q = query.trim();
   els.bookList.innerHTML = list.length
-    ? list.map((book) => `<article class="result-item" data-id="${book.id}"><h3>${book.title}</h3><p>作者 / ${book.author}</p>${book.resourceUrl ? `<p><a href="${book.resourceUrl}" target="_blank" rel="noopener noreferrer">${book.resourceLabel || '蓝奏云链接填写'}</a></p>` : ''}</article>`).join('')
+    ? list.map((book) => {
+        const title = escapeHtml(book.title);
+        const author = escapeHtml(book.author);
+        const label = escapeHtml(book.resourceLabel || '蓝奏云链接填写');
+        const href = escapeHtml(book.resourceUrl || '');
+        return `<article class="result-item" data-id="${escapeHtml(book.id)}"><h3>${title}</h3><p>作者 / ${author}</p>${href ? `<p><a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a></p>` : ''}${q ? `<p class="hint">匹配词：${escapeHtml(q)}</p>` : ''}</article>`;
+      }).join('')
     : '<article class="result-item"><p>没有找到内容</p></article>';
 }
 
-function filterBooks() {
-  const q = searchQuery();
-  const filtered = books.filter((book) => [book.title, book.author, book.resourceUrl || '', book.resourceLabel || ''].join(' ').toLowerCase().includes(q));
-  renderBooks(filtered);
+async function runLiveSearch() {
+  const query = currentQuery();
+  const seq = ++searchSeq;
+  lastQuery = query;
+  setSearchStatus(query ? '正在实时搜索…' : '显示全部资源');
+
+  try {
+    await loadBooksFromSupabase(query);
+    if (seq !== searchSeq) return;
+    renderBooks(books, query);
+    setSearchStatus(query ? `已找到 ${books.length} 条结果` : `共 ${books.length} 条资源`);
+  } catch (error) {
+    if (seq !== searchSeq) return;
+    console.error(error);
+    setSearchStatus('搜索失败，已切换为空结果');
+    books = [];
+    renderBooks([]);
+  }
+}
+
+function scheduleSearch() {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(runLiveSearch, SEARCH_DEBOUNCE_MS);
 }
 
 function showAdminPanel() {
@@ -106,12 +168,59 @@ function lockAdmin() {
 
 function renderAdminBooks() {
   els.adminBookList.innerHTML = books.length
-    ? books.map((book) => `<article class="result-item ${selectedIds.includes(book.id) ? 'selected' : ''}" data-id="${book.id}"><h3>${book.title}</h3><p>作者 / ${book.author}</p>${book.resourceUrl ? `<p><a href="${book.resourceUrl}" target="_blank" rel="noopener noreferrer">${book.resourceLabel || '蓝奏云链接填写'}</a></p>` : ''}<div class="actions"><button type="button" data-action="select">选择</button><button type="button" data-action="edit">编辑</button><button type="button" data-action="delete">删除</button></div></article>`).join('')
+    ? books.map((book) => {
+        const selected = selectedIds.includes(book.id) ? 'selected' : '';
+        const title = escapeHtml(book.title);
+        const author = escapeHtml(book.author);
+        const label = escapeHtml(book.resourceLabel || '蓝奏云链接填写');
+        const href = escapeHtml(book.resourceUrl || '');
+        return `<article class="result-item ${selected}" data-id="${escapeHtml(book.id)}"><h3>${title}</h3><p>作者 / ${author}</p>${href ? `<p><a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a></p>` : ''}<div class="actions"><button type="button" data-action="select">选择</button><button type="button" data-action="edit">编辑</button><button type="button" data-action="delete">删除</button></div></article>`;
+      }).join('')
     : '<article class="result-item"><p>暂无资源</p></article>';
 
-  els.adminBookList.querySelectorAll('[data-action="select"]').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); const id = Number(btn.closest('[data-id]').dataset.id); selectedIds = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]; renderAdminBooks(); }));
-  els.adminBookList.querySelectorAll('[data-action="edit"]').forEach((btn) => btn.addEventListener('click', async (e) => { e.stopPropagation(); const id = Number(btn.closest('[data-id]').dataset.id); const book = books.find((b) => b.id === id); if (!book) return; const title = prompt('书名', book.title); const author = prompt('作者', book.author); const resourceUrl = prompt('蓝奏云链接', book.resourceUrl || ''); const resourceLabel = prompt('按钮文字', book.resourceLabel || '蓝奏云链接填写'); const client = getSupabaseClient(); const payload = { title: title ?? book.title, author: author ?? book.author, resource_url: resourceUrl ?? book.resourceUrl, resource_label: resourceLabel ?? book.resourceLabel }; const { error } = await client.from(TABLE_NAME).update(payload).eq('id', id); if (error) return alert(`更新失败：${error.message}`); await refreshBooks(); }));
-  els.adminBookList.querySelectorAll('[data-action="delete"]').forEach((btn) => btn.addEventListener('click', async (e) => { e.stopPropagation(); const id = Number(btn.closest('[data-id]').dataset.id); const client = getSupabaseClient(); const { error } = await client.from(TABLE_NAME).delete().eq('id', id); if (error) return alert(`删除失败：${error.message}`); selectedIds = selectedIds.filter((x) => x !== id); await refreshBooks(); }));
+  els.adminBookList.querySelectorAll('[data-action="select"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = Number(btn.closest('[data-id]').dataset.id);
+      selectedIds = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
+      renderAdminBooks();
+    });
+  });
+
+  els.adminBookList.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = Number(btn.closest('[data-id]').dataset.id);
+      const book = books.find((b) => b.id === id);
+      if (!book) return;
+      const title = prompt('书名', book.title);
+      const author = prompt('作者', book.author);
+      const resourceUrl = prompt('链接', book.resourceUrl || '');
+      const resourceLabel = prompt('按钮文字', book.resourceLabel || '蓝奏云链接填写');
+      const client = getSupabaseClient();
+      const payload = {
+        title: title ?? book.title,
+        author: author ?? book.author,
+        resource_url: resourceUrl ?? book.resourceUrl,
+        resource_label: resourceLabel ?? book.resourceLabel,
+      };
+      const { error } = await client.from(TABLE_NAME).update(payload).eq('id', id);
+      if (error) return alert(`更新失败：${error.message}`);
+      await refreshBooks();
+    });
+  });
+
+  els.adminBookList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = Number(btn.closest('[data-id]').dataset.id);
+      const client = getSupabaseClient();
+      const { error } = await client.from(TABLE_NAME).delete().eq('id', id);
+      if (error) return alert(`删除失败：${error.message}`);
+      selectedIds = selectedIds.filter((x) => x !== id);
+      await refreshBooks();
+    });
+  });
 }
 
 async function addBook() {
@@ -154,13 +263,15 @@ async function deleteSelectedBooks() {
 }
 
 async function refreshBooks() {
-  await loadBooksFromSupabase();
-  filterBooks();
+  await loadBooksFromSupabase(lastQuery);
+  renderBooks(books, lastQuery);
+  setSearchStatus(lastQuery ? `已找到 ${books.length} 条结果` : `共 ${books.length} 条资源`);
   if (localStorage.getItem(ADMIN_KEY) === '1') renderAdminBooks();
 }
 
-els.searchInput.addEventListener('input', filterBooks);
-els.searchBtn.addEventListener('click', filterBooks);
+els.searchInput.addEventListener('input', scheduleSearch);
+els.searchBtn.addEventListener('click', runLiveSearch);
+els.searchInput.addEventListener('search', runLiveSearch);
 els.unlockAdminBtn.addEventListener('click', openPasswordDialog);
 els.dialogCancelBtn.addEventListener('click', () => els.passwordDialog?.close());
 els.dialogSubmitBtn.addEventListener('click', () => {
@@ -171,18 +282,25 @@ els.lockAdminBtn.addEventListener('click', lockAdmin);
 els.addBookBtn.addEventListener('click', addBook);
 els.saveJsonBtn.addEventListener('click', saveJson);
 els.downloadJsonBtn.addEventListener('click', downloadJson);
-els.selectAllAdminBtn.addEventListener('click', () => { selectedIds = books.map((book) => book.id); renderAdminBooks(); });
-els.clearSelectionBtn.addEventListener('click', () => { selectedIds = []; renderAdminBooks(); });
+els.selectAllAdminBtn.addEventListener('click', () => {
+  selectedIds = books.map((book) => book.id);
+  renderAdminBooks();
+});
+els.clearSelectionBtn.addEventListener('click', () => {
+  selectedIds = [];
+  renderAdminBooks();
+});
 els.deleteSelectedBtn.addEventListener('click', deleteSelectedBooks);
 
 (async () => {
   try {
-    await loadBooksFromSupabase();
+    await refreshBooks();
   } catch (error) {
     console.error(error);
     books = [];
+    renderBooks([]);
+    setSearchStatus('资源加载失败');
   }
-  filterBooks();
   if (localStorage.getItem(ADMIN_KEY) === '1') {
     els.admin.classList.remove('hidden');
     els.adminLocked.classList.add('hidden');
