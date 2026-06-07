@@ -35,9 +35,9 @@
     <main id="home">
       <section class="hero">
         <div class="hero-copy glass">
-          <span class="badge">仅用于你拥有授权的内容</span>
-          <h2>独立 `books.json` 数据源</h2>
-          <p>现在站点前台和后台都围绕单独的数据文件工作，你只需要维护 `books.json`，其余页面会自动读取并更新。</p>
+          <span class="badge" id="siteBadge">仅用于你拥有授权的内容</span>
+          <h2 id="siteHeroTitle">独立 `books.json` 数据源</h2>
+          <p id="siteHeroDesc">现在站点前台和后台都围绕单独的数据文件工作，你只需要维护 `books.json`，其余页面会自动读取并更新。</p>
           <div class="hero-actions">
             <a class="btn primary" href="#library">进入书库</a>
             <a class="btn secondary" href="#admin">打开后台</a>
@@ -48,7 +48,7 @@
             <div class="stat-card"><strong id="favoriteCount">0</strong><span>收藏</span></div>
           </div>
         </div>
-        <aside class="hero-side glass">
+        <aside class="hero-side glass" id="heroSideCard">
           <div class="featured-head">
             <span class="chip">封面轮播</span>
             <span class="chip ghost">静态网站</span>
@@ -142,7 +142,7 @@
         <div class="download-card glass muted"><h3>部署建议</h3><p>这是纯静态站点，最适合放到 GitHub Pages、Cloudflare Pages 或 Netlify。</p></div>
       </section>
 
-      <section class="admin-wrap glass" id="admin">
+      <section class="admin-wrap glass hidden" id="admin">
         <div class="section-head">
           <div>
             <h3 id="adminTitle">私密后台</h3>
@@ -159,6 +159,18 @@
         </div>
 
         <div id="adminPanel" class="hidden admin-grid">
+          <section class="inner-panel glass-inner">
+            <h4>站点信息</h4>
+            <div class="form-grid">
+              <input id="siteNameInput" placeholder="网站名称" />
+              <input id="siteSubTitleInput" placeholder="副标题" />
+              <input id="siteBadgeInput" placeholder="顶部徽标文案" />
+              <textarea id="siteHeroDescInput" placeholder="首页简介"></textarea>
+            </div>
+            <div class="admin-actions">
+              <button class="btn primary small" id="saveSiteMetaBtn" type="button">保存站点信息</button>
+            </div>
+          </section>
           <section class="inner-panel glass-inner">
             <h4>编辑 `books.json`</h4>
             <textarea id="jsonEditor"></textarea>
@@ -182,6 +194,10 @@
             <div class="admin-actions">
               <button class="btn primary" id="addBookBtn" type="button">添加到数据源</button>
             </div>
+          </section>
+          <section class="inner-panel glass-inner">
+            <h4>作品管理</h4>
+            <div id="adminBookList" class="recent-list"></div>
           </section>
         </div>
       </section>

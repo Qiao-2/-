@@ -6,7 +6,8 @@ const FONT_SIZE_KEY = 'novel_font_size';
 const LINE_HEIGHT_KEY = 'novel_line_height';
 const ADMIN_KEY = 'novel_admin_unlocked';
 const LIBRARY_KEY = 'novel_library_data';
-const ADMIN_PASSWORD = 'tomato-2026';
+const SITE_META_KEY = 'novel_site_meta';
+const ADMIN_PASSWORD = '663666';
 const BOOKS_URL = 'books.json';
 
 const defaultBooks = [
@@ -28,7 +29,7 @@ const state = {
 };
 
 const els = {
-  bookList: document.getElementById('bookList'), searchInput: document.getElementById('searchInput'), categoryFilter: document.getElementById('categoryFilter'), readerTitle: document.getElementById('readerTitle'), readerMeta: document.getElementById('readerMeta'), readerPanel: document.getElementById('readerPanel'), readerCategory: document.getElementById('readerCategory'), chapterSelect: document.getElementById('chapterSelect'), tocList: document.getElementById('tocList'), downloadBtn: document.getElementById('downloadBtn'), favBtn: document.getElementById('favBtn'), favoriteList: document.getElementById('favoriteList'), favoriteCount: document.getElementById('favoriteCount'), bookCount: document.getElementById('bookCount'), chapterCount: document.getElementById('chapterCount'), featuredCard: document.getElementById('featuredCard'), featuredCover: document.getElementById('featuredCover'), themeToggle: document.getElementById('themeToggle'), carouselPrev: document.getElementById('carouselPrev'), carouselNext: document.getElementById('carouselNext'), recentList: document.getElementById('recentList'), fontSizeRange: document.getElementById('fontSizeRange'), lineHeightRange: document.getElementById('lineHeightRange'), progressBar: document.getElementById('progressBar'), unlockAdminBtn: document.getElementById('unlockAdminBtn'), lockAdminBtn: document.getElementById('lockAdminBtn'), adminLocked: document.getElementById('adminLocked'), adminPanel: document.getElementById('adminPanel'), jsonEditor: document.getElementById('jsonEditor'), loadJsonBtn: document.getElementById('loadJsonBtn'), saveJsonBtn: document.getElementById('saveJsonBtn'), downloadJsonBtn: document.getElementById('downloadJsonBtn'), addBookBtn: document.getElementById('addBookBtn'), newTitle: document.getElementById('newTitle'), newAuthor: document.getElementById('newAuthor'), newCategory: document.getElementById('newCategory'), newTags: document.getElementById('newTags'), newSummary: document.getElementById('newSummary'), newColor: document.getElementById('newColor'), newChapters: document.getElementById('newChapters'), adminTitle: document.getElementById('adminTitle') };
+  bookList: document.getElementById('bookList'), searchInput: document.getElementById('searchInput'), categoryFilter: document.getElementById('categoryFilter'), readerTitle: document.getElementById('readerTitle'), readerMeta: document.getElementById('readerMeta'), readerPanel: document.getElementById('readerPanel'), readerCategory: document.getElementById('readerCategory'), chapterSelect: document.getElementById('chapterSelect'), tocList: document.getElementById('tocList'), downloadBtn: document.getElementById('downloadBtn'), favBtn: document.getElementById('favBtn'), favoriteList: document.getElementById('favoriteList'), favoriteCount: document.getElementById('favoriteCount'), bookCount: document.getElementById('bookCount'), chapterCount: document.getElementById('chapterCount'), featuredCard: document.getElementById('featuredCard'), featuredCover: document.getElementById('featuredCover'), themeToggle: document.getElementById('themeToggle'), carouselPrev: document.getElementById('carouselPrev'), carouselNext: document.getElementById('carouselNext'), recentList: document.getElementById('recentList'), fontSizeRange: document.getElementById('fontSizeRange'), lineHeightRange: document.getElementById('lineHeightRange'), progressBar: document.getElementById('progressBar'), unlockAdminBtn: document.getElementById('unlockAdminBtn'), lockAdminBtn: document.getElementById('lockAdminBtn'), adminLocked: document.getElementById('adminLocked'), adminPanel: document.getElementById('adminPanel'), jsonEditor: document.getElementById('jsonEditor'), loadJsonBtn: document.getElementById('loadJsonBtn'), saveJsonBtn: document.getElementById('saveJsonBtn'), downloadJsonBtn: document.getElementById('downloadJsonBtn'), addBookBtn: document.getElementById('addBookBtn'), newTitle: document.getElementById('newTitle'), newAuthor: document.getElementById('newAuthor'), newCategory: document.getElementById('newCategory'), newTags: document.getElementById('newTags'), newSummary: document.getElementById('newSummary'), newColor: document.getElementById('newColor'), newChapters: document.getElementById('newChapters'), siteNameInput: document.getElementById('siteNameInput'), siteSubTitleInput: document.getElementById('siteSubTitleInput'), siteBadgeInput: document.getElementById('siteBadgeInput'), siteHeroDescInput: document.getElementById('siteHeroDescInput'), saveSiteMetaBtn: document.getElementById('saveSiteMetaBtn'), adminTitle: document.getElementById('adminTitle'), siteBadge: document.getElementById('siteBadge'), siteHeroTitle: document.getElementById('siteHeroTitle'), siteHeroDesc: document.getElementById('siteHeroDesc'), heroSideCard: document.getElementById('heroSideCard') };
 
 function persistBooks() { localStorage.setItem(LIBRARY_KEY, JSON.stringify(books)); }
 function getCurrentBook() { return books.find((b) => b.id === state.currentBookId) || books[0]; }
@@ -42,6 +43,28 @@ function renderCategoryFilter() { const categories = ['all', ...new Set(books.ma
 function pushRecent(bookId) { state.recent = [bookId, ...state.recent.filter((id) => id !== bookId)].slice(0, 4); localStorage.setItem(RECENT_KEY, JSON.stringify(state.recent)); }
 function renderRecent() { const list = state.recent.map((id) => books.find((b) => b.id === id)).filter(Boolean); els.recentList.innerHTML = list.length ? list.map((book) => `<div class="recent-item" data-id="${book.id}"><strong>${book.title}</strong><p>${book.author}</p></div>`).join('') : '<div class="recent-item"><p>还没有最近阅读记录。</p></div>'; els.recentList.querySelectorAll('.recent-item[data-id]').forEach((item) => item.addEventListener('click', () => { state.currentBookId = Number(item.dataset.id); const progress = loadProgress(state.currentBookId); state.currentChapterIndex = progress.chapterIndex ?? 0; state.currentPageIndex = progress.pageIndex ?? 0; renderAll(); })); }
 function renderBooks(list) { els.bookList.innerHTML = list.map((book) => `<article class="library-item ${book.id === state.currentBookId ? 'active' : ''}" data-id="${book.id}"><div class="card-head"><div><span class="chip">${book.category}</span><h4>${book.title}</h4><p>${book.author}</p></div><div class="book-cover" style="background:${book.color}"></div></div><p>${book.summary}</p><div class="meta-row">${book.tags.map((tag) => `<span class="tag">${tag}</span>`).join('')}</div></article>`).join(''); els.bookList.querySelectorAll('.library-item').forEach((item) => item.addEventListener('click', () => { state.currentBookId = Number(item.dataset.id); const progress = loadProgress(state.currentBookId); state.currentChapterIndex = progress.chapterIndex ?? 0; state.currentPageIndex = progress.pageIndex ?? 0; pushRecent(state.currentBookId); renderAll(); })); }
+function loadSiteMeta() {
+  try { return JSON.parse(localStorage.getItem(SITE_META_KEY) || '{}'); } catch { return {}; }
+}
+function saveSiteMeta(meta) {
+  localStorage.setItem(SITE_META_KEY, JSON.stringify(meta));
+}
+function applySiteMeta() {
+  const meta = loadSiteMeta();
+  const title = meta.title || '番茄阅读器 Pro';
+  const subtitle = meta.subtitle || '独立 `books.json` 数据源版';
+  const badge = meta.badge || '仅用于你拥有授权的内容';
+  const heroDesc = meta.heroDesc || '现在站点前台和后台都围绕单独的数据文件工作，你只需要维护 `books.json`，其余页面会自动读取并更新。';
+  document.title = `${title} - 合法阅读与下载`;
+  els.siteNameInput.value = title;
+  els.siteSubTitleInput.value = subtitle;
+  els.siteBadgeInput.value = badge;
+  els.siteHeroDescInput.value = heroDesc;
+  els.siteBadge.textContent = badge;
+  els.siteHeroTitle.textContent = title;
+  els.siteHeroDesc.textContent = heroDesc;
+  if (els.adminTitle) els.adminTitle.textContent = `${title} 后台`;
+}
 function renderFeatured() { const book = getCurrentBook(); els.featuredCard.querySelector('h3').textContent = book.title; els.featuredCard.querySelector('p').textContent = book.summary; els.featuredCover.style.background = book.color; }
 function paginateText(text, maxLength = 160) { const paragraphs = text.split('\n\n'); const pages = []; let buffer = ''; paragraphs.forEach((para) => { if ((buffer + '\n\n' + para).trim().length > maxLength && buffer) { pages.push(buffer.trim()); buffer = para; } else { buffer = buffer ? `${buffer}\n\n${para}` : para; } }); if (buffer.trim()) pages.push(buffer.trim()); return pages.length ? pages : [text]; }
 function persistCurrentProgress() { const book = getCurrentBook(); saveProgress(book.id, { chapterIndex: state.currentChapterIndex, pageIndex: state.currentPageIndex }); pushRecent(book.id); }
@@ -54,15 +77,18 @@ function applyTheme(theme) { document.documentElement.dataset.theme = theme; loc
 function initTheme() { applyTheme(localStorage.getItem(THEME_KEY) || 'dark'); }
 function applyReaderPrefs() { const fontSize = Number(localStorage.getItem(FONT_SIZE_KEY) || 16); const lineHeight = Number(localStorage.getItem(LINE_HEIGHT_KEY) || 1.95); document.documentElement.style.setProperty('--reader-font-size', `${fontSize}px`); document.documentElement.style.setProperty('--reader-line-height', String(lineHeight)); els.fontSizeRange.value = String(fontSize); els.lineHeightRange.value = String(lineHeight); }
 function loadBooksFromSource() { return fetch(BOOKS_URL, { cache: 'no-store' }).then((res) => { if (!res.ok) throw new Error(`无法加载 ${BOOKS_URL}`); return res.json(); }).catch(() => defaultBooks); }
-function renderAll() { updateStats(); renderCategoryFilter(); renderBooks(state.filteredBooks); renderReader(); renderFavorites(); renderFeatured(); renderRecent(); syncAdminUI(); }
+function renderAll() { updateStats(); renderCategoryFilter(); renderBooks(state.filteredBooks); renderReader(); renderFavorites(); renderFeatured(); renderRecent(); syncAdminUI(); renderAdminBooks(); }
 function switchFeatured(step) { const currentIndex = books.findIndex((book) => book.id === state.currentBookId); const nextIndex = (currentIndex + step + books.length) % books.length; state.currentBookId = books[nextIndex].id; const progress = loadProgress(state.currentBookId); state.currentChapterIndex = progress.chapterIndex ?? 0; state.currentPageIndex = progress.pageIndex ?? 0; pushRecent(state.currentBookId); renderAll(); }
-function syncAdminUI() { els.adminLocked.classList.toggle('hidden', state.adminUnlocked); els.adminPanel.classList.toggle('hidden', !state.adminUnlocked); els.jsonEditor.value = JSON.stringify(books, null, 2); }
+function syncAdminUI() { els.adminLocked.classList.toggle('hidden', state.adminUnlocked); els.adminPanel.classList.toggle('hidden', !state.adminUnlocked); els.jsonEditor.value = JSON.stringify(books, null, 2); if (state.adminUnlocked) applySiteMeta(); }
 function unlockAdmin() { const pwd = prompt('请输入后台密码'); if (pwd === null) return; if (pwd === ADMIN_PASSWORD) { state.adminUnlocked = true; localStorage.setItem(ADMIN_KEY, '1'); syncAdminUI(); } else alert('密码错误'); }
 function lockAdmin() { state.adminUnlocked = false; localStorage.removeItem(ADMIN_KEY); syncAdminUI(); }
 function loadJsonIntoBooks() { try { const parsed = JSON.parse(els.jsonEditor.value); if (!Array.isArray(parsed)) throw new Error('JSON 必须是数组'); books = parsed; persistBooks(); state.filteredBooks = books; if (!books.some((b) => b.id === state.currentBookId)) { state.currentBookId = books[0]?.id || 1; state.currentChapterIndex = 0; state.currentPageIndex = 0; } renderAll(); alert('已载入并更新预览'); } catch (err) { alert(`JSON 格式错误：${err.message}`); } }
 function saveJson() { try { const parsed = JSON.parse(els.jsonEditor.value); if (!Array.isArray(parsed)) throw new Error('JSON 必须是数组'); books = parsed; persistBooks(); renderAll(); alert('已保存到浏览器'); } catch (err) { alert(`JSON 格式错误：${err.message}`); } }
+function saveSiteMetaFromForm() { const meta = { title: els.siteNameInput.value.trim() || '番茄阅读器 Pro', subtitle: els.siteSubTitleInput.value.trim() || '独立 `books.json` 数据源版', badge: els.siteBadgeInput.value.trim() || '仅用于你拥有授权的内容', heroDesc: els.siteHeroDescInput.value.trim() || '现在站点前台和后台都围绕单独的数据文件工作，你只需要维护 `books.json`，其余页面会自动读取并更新。' }; saveSiteMeta(meta); applySiteMeta(); alert('站点信息已保存'); }
 function downloadJson() { const blob = new Blob([JSON.stringify(books, null, 2)], { type: 'application/json;charset=UTF-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'books.json'; a.click(); URL.revokeObjectURL(url); }
 function addBook() { try { const chapters = els.newChapters.value.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => { const parts = line.split('||'); return { title: (parts[0] || '新章节').trim(), content: (parts[1] || '').trim() || '暂无内容' }; }); const book = { id: Date.now(), title: els.newTitle.value.trim(), author: els.newAuthor.value.trim(), category: els.newCategory.value.trim() || '未分类', tags: els.newTags.value.split(',').map((s) => s.trim()).filter(Boolean), summary: els.newSummary.value.trim(), color: els.newColor.value.trim() || 'linear-gradient(135deg,#fb7185,#a855f7)', chapters: chapters.length ? chapters : [{ title: '第一章', content: '暂无内容' }] }; if (!book.title || !book.author) throw new Error('书名和作者不能为空'); books.unshift(book); persistBooks(); renderAll(); alert('作品已添加'); } catch (err) { alert(`添加失败：${err.message}`); } }
+function deleteBook(bookId) { books = books.filter((book) => book.id !== bookId); persistBooks(); if (!books.length) books = defaultBooks; state.filteredBooks = books; if (!books.some((b) => b.id === state.currentBookId)) { state.currentBookId = books[0].id; state.currentChapterIndex = 0; state.currentPageIndex = 0; } renderAll(); }
+function renderAdminBooks() { if (!els.adminBookList) return; els.adminBookList.innerHTML = books.map((book) => `<div class="recent-item" data-id="${book.id}"><strong>${book.title}</strong><p>${book.author} · ${book.category}</p><div class="admin-actions"><button class="btn secondary small" data-action="edit">编辑</button><button class="btn secondary small" data-action="delete">删除</button></div></div>`).join(''); els.adminBookList.querySelectorAll('[data-action="delete"]').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); const card = btn.closest('[data-id]'); deleteBook(Number(card.dataset.id)); })); els.adminBookList.querySelectorAll('[data-action="edit"]').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); const id = Number(btn.closest('[data-id]').dataset.id); const book = books.find((b) => b.id === id); if (!book) return; els.jsonEditor.value = JSON.stringify(books.map((b) => b.id === id ? { ...book, title: prompt('书名', book.title) || book.title, author: prompt('作者', book.author) || book.author, category: prompt('分类', book.category) || book.category, summary: prompt('简介', book.summary) || book.summary } : b), null, 2); }); }); }
 function persistBooks() { localStorage.setItem(LIBRARY_KEY, JSON.stringify(books)); }
 
 els.searchInput.addEventListener('input', filterBooks);
@@ -80,6 +106,7 @@ els.loadJsonBtn.addEventListener('click', loadJsonIntoBooks);
 els.saveJsonBtn.addEventListener('click', saveJson);
 els.downloadJsonBtn.addEventListener('click', downloadJson);
 els.addBookBtn.addEventListener('click', addBook);
+els.saveSiteMetaBtn.addEventListener('click', saveSiteMetaFromForm);
 
 (async () => {
   books = await loadBooksFromSource();
@@ -89,5 +116,6 @@ els.addBookBtn.addEventListener('click', addBook);
   if (!books.some((b) => b.id === state.currentBookId)) state.currentBookId = books[0].id;
   initTheme();
   applyReaderPrefs();
+  applySiteMeta();
   renderAll();
 })();
