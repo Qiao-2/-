@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>番茄小说站 Pro - 合法阅读与下载</title>
+    <meta
+      name="description"
+      content="一个适合 GitHub Pages 部署的高级小说网站模板，支持封面轮播、章节分页、阅读进度记忆、收藏、最近阅读和 TXT 导出。仅用于你拥有授权或公版内容。"
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+
+    <header class="topbar glass">
+      <div class="brand">
+        <div class="logo">番</div>
+        <div>
+          <h1>番茄小说站 Pro</h1>
+          <p>GitHub Pages 高级小说网站模板</p>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="#home">首页</a>
+        <a href="#library">书库</a>
+        <a href="#reader">阅读器</a>
+        <a href="#favorites">收藏</a>
+      </nav>
+
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="切换主题">
+        <span>🌙</span>
+      </button>
+    </header>
+
+    <main id="home">
+      <section class="hero">
+        <div class="hero-copy glass">
+          <span class="badge">适合公开版权 / 你有授权的内容</span>
+          <h2>最终成品版小说网站</h2>
+          <p>
+            支持封面轮播、书库筛选、章节目录、分页阅读、阅读进度记忆、最近阅读、收藏、字体调节与 TXT 导出。
+          </p>
+
+          <div class="hero-actions">
+            <a class="btn primary" href="#library">进入书库</a>
+            <a class="btn secondary" href="#reader">打开阅读器</a>
+          </div>
+
+          <div class="mini-stats">
+            <div class="stat-card">
+              <strong id="bookCount">0</strong>
+              <span>本作品</span>
+            </div>
+            <div class="stat-card">
+              <strong id="chapterCount">0</strong>
+              <span>章节</span>
+            </div>
+            <div class="stat-card">
+              <strong id="favoriteCount">0</strong>
+              <span>收藏</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="hero-side glass">
+          <div class="featured-head">
+            <span class="chip">封面轮播</span>
+            <span class="chip ghost">静态网站</span>
+          </div>
+          <article class="featured-card" id="featuredCard">
+            <h3>春夜归人</h3>
+            <p>温柔、干净、适合展示封面与简介的主推作品。</p>
+            <div class="cover cover-1" id="featuredCover"></div>
+          </article>
+          <div class="carousel-controls">
+            <button class="btn secondary small" id="carouselPrev" type="button">上一部</button>
+            <button class="btn secondary small" id="carouselNext" type="button">下一部</button>
+          </div>
+          <div class="hero-tips">
+            <p>支持 GitHub Pages 一键部署</p>
+            <p>支持手机端自适应阅读</p>
+            <p>支持收藏与下载导出</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel glass">
+          <h3>最近阅读</h3>
+          <div id="recentList" class="recent-list"></div>
+        </section>
+        <section class="panel glass">
+          <h3>阅读小工具</h3>
+          <div class="tool-row">
+            <label>字体大小 <input id="fontSizeRange" type="range" min="14" max="22" step="1" value="16" /></label>
+            <label>行距 <input id="lineHeightRange" type="range" min="1.6" max="2.4" step="0.1" value="1.95" /></label>
+          </div>
+        </section>
+      </section>
+
+      <section class="toolbar glass" id="library">
+        <div>
+          <h3>作品书库</h3>
+          <p>搜索书名、作者、标签或分类</p>
+        </div>
+        <div class="toolbar-actions">
+          <label class="searchbox">
+            <input id="searchInput" type="search" placeholder="例如：爱情 / 科幻 / 归人" />
+          </label>
+          <select id="categoryFilter" aria-label="分类筛选">
+            <option value="all">全部分类</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="library-grid" id="bookList"></section>
+
+      <section class="reader-wrap">
+        <section class="reader-section glass" id="reader">
+          <div class="reader-progress"><div id="progressBar"></div></div>
+          <div class="section-head">
+            <div>
+              <span class="chip" id="readerCategory">分类</span>
+              <h3 id="readerTitle">在线阅读</h3>
+              <p id="readerMeta">点击上方书籍即可查看章节</p>
+            </div>
+            <div class="reader-actions">
+              <button class="btn secondary" id="favBtn" type="button">收藏</button>
+              <button class="btn primary" id="downloadBtn" type="button">下载 TXT</button>
+            </div>
+          </div>
+
+          <div class="reader-layout">
+            <aside class="toc glass-inner">
+              <h4>章节目录</h4>
+              <select id="chapterSelect" aria-label="选择章节"></select>
+              <div class="toc-list" id="tocList"></div>
+            </aside>
+
+            <article class="reader-panel glass-inner" id="readerPanel">
+              <h4>欢迎</h4>
+              <p>请选择一本书开始阅读。这里的内容都是示例，你可以替换成你自己拥有版权或已获授权的文本。</p>
+              <div class="page-footer">
+                <button class="btn secondary small" id="pagePrev" type="button">上一页</button>
+                <span id="pageIndicator">1 / 1</span>
+                <button class="btn secondary small" id="pageNext" type="button">下一页</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="side-panel glass" id="favorites">
+          <div class="section-head compact">
+            <div>
+              <h3>收藏夹</h3>
+              <p>保存你最喜欢的作品</p>
+            </div>
+          </div>
+          <div class="favorite-list" id="favoriteList"></div>
+        </section>
+      </section>
+
+      <section class="download-section">
+        <div class="download-card glass">
+          <h3>导出说明</h3>
+          <p>当前作品可一键导出为 TXT，适合你自己的小说内容导出和备份。</p>
+        </div>
+        <div class="download-card glass muted">
+          <h3>部署建议</h3>
+          <p>这是纯静态站点，最适合放到 GitHub Pages、Cloudflare Pages 或 Netlify。</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>仅用于合法内容展示与下载，不要用于侵权内容。</p>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
