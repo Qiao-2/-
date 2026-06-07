@@ -3,18 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>番茄小说站 Pro - 合法阅读与下载</title>
-    <meta
-      name="description"
-      content="一个适合 GitHub Pages 部署的高级小说网站模板，支持封面轮播、章节分页、阅读进度记忆、收藏、最近阅读和 TXT 导出。仅用于你拥有授权或公版内容。"
-    />
+    <title>番茄阅读器 Pro - 合法阅读与下载</title>
+    <meta name="description" content="一个适合 GitHub Pages 部署的高级阅读器模板，使用独立 books.json 数据源，支持私密后台、收藏、最近阅读和 TXT 导出。仅用于你拥有授权或公版内容。" />
     <meta name="theme-color" content="#0f172a" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -23,63 +17,45 @@
 
     <header class="topbar glass">
       <div class="brand">
-        <div class="logo">番</div>
+        <div class="logo">阅</div>
         <div>
-          <h1>番茄小说站 Pro</h1>
-          <p>GitHub Pages 高级小说网站模板</p>
+          <h1>番茄阅读器 Pro</h1>
+          <p>独立 `books.json` 数据源版</p>
         </div>
       </div>
-
       <nav class="nav">
         <a href="#home">首页</a>
         <a href="#library">书库</a>
         <a href="#reader">阅读器</a>
-        <a href="#favorites">收藏</a>
+        <a href="#admin">后台</a>
       </nav>
-
-      <button class="icon-btn" id="themeToggle" type="button" aria-label="切换主题">
-        <span>🌙</span>
-      </button>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="切换主题"><span>🌙</span></button>
     </header>
 
     <main id="home">
       <section class="hero">
         <div class="hero-copy glass">
-          <span class="badge">适合公开版权 / 你有授权的内容</span>
-          <h2>最终成品版小说网站</h2>
-          <p>
-            支持封面轮播、书库筛选、章节目录、分页阅读、阅读进度记忆、最近阅读、收藏、字体调节与 TXT 导出。
-          </p>
-
+          <span class="badge">仅用于你拥有授权的内容</span>
+          <h2>独立 `books.json` 数据源</h2>
+          <p>现在站点前台和后台都围绕单独的数据文件工作，你只需要维护 `books.json`，其余页面会自动读取并更新。</p>
           <div class="hero-actions">
             <a class="btn primary" href="#library">进入书库</a>
-            <a class="btn secondary" href="#reader">打开阅读器</a>
+            <a class="btn secondary" href="#admin">打开后台</a>
           </div>
-
           <div class="mini-stats">
-            <div class="stat-card">
-              <strong id="bookCount">0</strong>
-              <span>本作品</span>
-            </div>
-            <div class="stat-card">
-              <strong id="chapterCount">0</strong>
-              <span>章节</span>
-            </div>
-            <div class="stat-card">
-              <strong id="favoriteCount">0</strong>
-              <span>收藏</span>
-            </div>
+            <div class="stat-card"><strong id="bookCount">0</strong><span>本作品</span></div>
+            <div class="stat-card"><strong id="chapterCount">0</strong><span>章节</span></div>
+            <div class="stat-card"><strong id="favoriteCount">0</strong><span>收藏</span></div>
           </div>
         </div>
-
         <aside class="hero-side glass">
           <div class="featured-head">
             <span class="chip">封面轮播</span>
             <span class="chip ghost">静态网站</span>
           </div>
           <article class="featured-card" id="featuredCard">
-            <h3>春夜归人</h3>
-            <p>温柔、干净、适合展示封面与简介的主推作品。</p>
+            <h3>加载中</h3>
+            <p>正在从 `books.json` 读取内容。</p>
             <div class="cover cover-1" id="featuredCover"></div>
           </article>
           <div class="carousel-controls">
@@ -87,9 +63,9 @@
             <button class="btn secondary small" id="carouselNext" type="button">下一部</button>
           </div>
           <div class="hero-tips">
-            <p>支持 GitHub Pages 一键部署</p>
-            <p>支持手机端自适应阅读</p>
-            <p>支持收藏与下载导出</p>
+            <p>独立数据源，方便长期维护</p>
+            <p>支持 GitHub Pages 部署</p>
+            <p>支持私密后台管理</p>
           </div>
         </aside>
       </section>
@@ -114,12 +90,8 @@
           <p>搜索书名、作者、标签或分类</p>
         </div>
         <div class="toolbar-actions">
-          <label class="searchbox">
-            <input id="searchInput" type="search" placeholder="例如：爱情 / 科幻 / 归人" />
-          </label>
-          <select id="categoryFilter" aria-label="分类筛选">
-            <option value="all">全部分类</option>
-          </select>
+          <label class="searchbox"><input id="searchInput" type="search" placeholder="例如：爱情 / 科幻 / 归人" /></label>
+          <select id="categoryFilter" aria-label="分类筛选"><option value="all">全部分类</option></select>
         </div>
       </section>
 
@@ -139,17 +111,15 @@
               <button class="btn primary" id="downloadBtn" type="button">下载 TXT</button>
             </div>
           </div>
-
           <div class="reader-layout">
             <aside class="toc glass-inner">
               <h4>章节目录</h4>
               <select id="chapterSelect" aria-label="选择章节"></select>
               <div class="toc-list" id="tocList"></div>
             </aside>
-
             <article class="reader-panel glass-inner" id="readerPanel">
               <h4>欢迎</h4>
-              <p>请选择一本书开始阅读。这里的内容都是示例，你可以替换成你自己拥有版权或已获授权的文本。</p>
+              <p>请选择一本书开始阅读。</p>
               <div class="page-footer">
                 <button class="btn secondary small" id="pagePrev" type="button">上一页</button>
                 <span id="pageIndicator">1 / 1</span>
@@ -161,31 +131,63 @@
 
         <section class="side-panel glass" id="favorites">
           <div class="section-head compact">
-            <div>
-              <h3>收藏夹</h3>
-              <p>保存你最喜欢的作品</p>
-            </div>
+            <div><h3>收藏夹</h3><p>保存你最喜欢的作品</p></div>
           </div>
           <div class="favorite-list" id="favoriteList"></div>
         </section>
       </section>
 
       <section class="download-section">
-        <div class="download-card glass">
-          <h3>导出说明</h3>
-          <p>当前作品可一键导出为 TXT，适合你自己的小说内容导出和备份。</p>
+        <div class="download-card glass"><h3>导出说明</h3><p>当前作品可一键导出为 TXT，适合你自己的小说内容导出和备份。</p></div>
+        <div class="download-card glass muted"><h3>部署建议</h3><p>这是纯静态站点，最适合放到 GitHub Pages、Cloudflare Pages 或 Netlify。</p></div>
+      </section>
+
+      <section class="admin-wrap glass" id="admin">
+        <div class="section-head">
+          <div>
+            <h3 id="adminTitle">私密后台</h3>
+            <p>仅用于管理你自己的合法书库数据。</p>
+          </div>
+          <div class="admin-actions">
+            <button class="btn secondary" id="unlockAdminBtn" type="button">解锁后台</button>
+            <button class="btn secondary" id="lockAdminBtn" type="button">锁定后台</button>
+          </div>
         </div>
-        <div class="download-card glass muted">
-          <h3>部署建议</h3>
-          <p>这是纯静态站点，最适合放到 GitHub Pages、Cloudflare Pages 或 Netlify。</p>
+
+        <div class="admin-locked" id="adminLocked">
+          <p>后台已锁定。点击“解锁后台”并输入密码后，才能编辑数据。</p>
+        </div>
+
+        <div id="adminPanel" class="hidden admin-grid">
+          <section class="inner-panel glass-inner">
+            <h4>编辑 `books.json`</h4>
+            <textarea id="jsonEditor"></textarea>
+            <div class="admin-actions">
+              <button class="btn secondary small" id="loadJsonBtn" type="button">载入预览</button>
+              <button class="btn primary small" id="saveJsonBtn" type="button">保存</button>
+              <button class="btn secondary small" id="downloadJsonBtn" type="button">下载 JSON</button>
+            </div>
+          </section>
+          <section class="inner-panel glass-inner">
+            <h4>新增作品</h4>
+            <div class="form-grid">
+              <input id="newTitle" placeholder="书名" />
+              <input id="newAuthor" placeholder="作者" />
+              <input id="newCategory" placeholder="分类" />
+              <input id="newTags" placeholder="标签，逗号分隔" />
+              <textarea id="newSummary" placeholder="简介"></textarea>
+              <input id="newColor" placeholder="封面渐变，例如 linear-gradient(...)" />
+              <textarea id="newChapters" placeholder="章节格式：标题||内容，每行一章"></textarea>
+            </div>
+            <div class="admin-actions">
+              <button class="btn primary" id="addBookBtn" type="button">添加到数据源</button>
+            </div>
+          </section>
         </div>
       </section>
     </main>
 
-    <footer class="footer">
-      <p>仅用于合法内容展示与下载，不要用于侵权内容。</p>
-    </footer>
-
+    <footer class="footer"><p>仅用于合法内容展示与下载，不要用于侵权内容。</p></footer>
     <script src="script.js"></script>
   </body>
 </html>
