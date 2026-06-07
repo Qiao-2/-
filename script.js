@@ -4,6 +4,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_HYSdxuODVwR6GKlla7fcMg_o0h8-aJ6';
 const TABLE_NAME = 'resources';
 const ADMIN_KEY = 'novel_admin_unlocked';
 const SEARCH_DEBOUNCE_MS = 220;
+const ADMIN_UNLOCKED_THIS_SESSION = 'novel_admin_session_unlocked';
 
 let selectedIds = [];
 let supabaseClient = null;
@@ -116,20 +117,22 @@ async function runLiveSearch() {
     const resp = await fetch(`/api/fanqie/search?q=${encodeURIComponent(query)}`);
     const data = await resp.json();
     if (seq !== searchSeq) return;
-    if (!resp.ok) throw new Error(data?.message || '搜索失败');
+    if (!resp.ok) throw new Error(data?.message || `HTTP ${resp.status}`);
     books = (data.results || []).map((item, index) => ({
       id: item.url || `${item.title}-${index}`,
       title: item.title || '',
       author: item.author || '',
       resourceUrl: item.url || '',
       resourceLabel: '查看番茄结果',
+      intro: item.intro || '',
+      cover: item.cover || '',
     }));
     renderBooks(books, query);
     setSearchStatus(query ? `已找到 ${books.length} 条番茄结果` : '请输入书名开始搜索');
   } catch (error) {
     if (seq !== searchSeq) return;
     console.error(error);
-    setSearchStatus('番茄搜索失败');
+    setSearchStatus(`番茄搜索失败：${error.message || '未知错误'}`);
     books = [];
     renderBooks([]);
   }
@@ -146,7 +149,6 @@ function showAdminPanel() {
 }
 
 function openPasswordDialog() {
-  showAdminPanel();
   if (els.passwordDialog?.showModal) {
     els.adminPasswordInput.value = '';
     els.passwordDialog.showModal();
@@ -159,7 +161,9 @@ function unlockAdmin(password) {
     alert('密码错误');
     return false;
   }
-  localStorage.setItem(ADMIN_KEY, '1');
+  sessionStorage.setItem(ADMIN_UNLOCKED_THIS_SESSION, '1');
+  localStorage.removeItem(ADMIN_KEY);
+  els.admin.classList.remove('hidden');
   els.adminLocked.classList.add('hidden');
   els.adminPanel.classList.remove('hidden');
   renderAdminBooks();
@@ -167,6 +171,7 @@ function unlockAdmin(password) {
 }
 
 function lockAdmin() {
+  sessionStorage.removeItem(ADMIN_UNLOCKED_THIS_SESSION);
   localStorage.removeItem(ADMIN_KEY);
   selectedIds = [];
   els.admin.classList.add('hidden');
@@ -311,7 +316,7 @@ els.deleteSelectedBtn.addEventListener('click', deleteSelectedBooks);
     renderBooks([]);
     setSearchStatus('资源加载失败');
   }
-  if (localStorage.getItem(ADMIN_KEY) === '1') {
+  if (sessionStorage.getItem(ADMIN_UNLOCKED_THIS_SESSION) === '1') {
     els.admin.classList.remove('hidden');
     els.adminLocked.classList.add('hidden');
     els.adminPanel.classList.remove('hidden');

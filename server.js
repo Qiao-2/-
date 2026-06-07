@@ -80,6 +80,17 @@ function parseState(html) {
   }
 }
 
+function summarizeState(state) {
+  return {
+    topLevelKeys: state ? Object.keys(state).slice(0, 20) : [],
+    searchKeys: state?.search ? Object.keys(state.search).slice(0, 20) : [],
+    searchBookListType: Array.isArray(state?.search?.searchBookList) ? 'array' : typeof state?.search?.searchBookList,
+    searchBookListCount: Array.isArray(state?.search?.searchBookList) ? state.search.searchBookList.length : 0,
+    authorDataType: Array.isArray(state?.search?.authorData) ? 'array' : typeof state?.search?.authorData,
+    authorDataCount: Array.isArray(state?.search?.authorData) ? state.search.authorData.length : 0,
+  };
+}
+
 function normalizeItem(item) {
   const title = cleanText(item.bookName || item.title || item.name || '');
   const author = cleanText(item.authorName || item.author || item.nickName || '');
@@ -137,8 +148,8 @@ function extractFallback(html, query) {
 
 async function searchFanqie(query) {
   const q = sanitizeQuery(query);
-  const key = q || '__all__';
-  const cached = cache.get(key);
+  const cacheKey = q || '__all__';
+  const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
 
   const url = q ? `https://fanqienovel.com/search/${encodeURIComponent(q)}` : 'https://fanqienovel.com/search/%E5%85%A8%E7%BD%91%E6%90%9C%E7%B4%A2';
@@ -151,19 +162,35 @@ async function searchFanqie(query) {
   });
   const html = await resp.text();
   const state = parseState(html);
-  const data = (state ? extractFromState(state, q) : [])
-    .concat(extractFallback(html, q));
+  const extracted = [];
+  if (state) extracted.push(...extractFromState(state, q));
+  extracted.push(...extractFallback(html, q));
+
   const dedup = [];
   const seen = new Set();
-  for (const item of data) {
-    const key = `${item.title}|${item.author}|${item.url}`;
-    if (!item.title || seen.has(key)) continue;
-    seen.add(key);
+  for (const item of extracted) {
+    const itemKey = `${item.title}|${item.author}|${item.url}`;
+    if (!item.title || seen.has(itemKey)) continue;
+    seen.add(itemKey);
     dedup.push(item);
     if (dedup.length >= 20) break;
   }
-  const payload = { query: q, count: dedup.length, results: dedup, source: 'fanqie' };
-  cache.set(key, { ts: Date.now(), data: payload });
+
+  const payload = {
+    query: q,
+    count: dedup.length,
+    results: dedup,
+    source: 'fanqie',
+    debug: {
+      requestedUrl: url,
+      httpStatus: resp.status,
+      contentLength: html.length,
+      hasInitialState: Boolean(state),
+      stateSummary: summarizeState(state),
+      fallbackCount: extractFallback(html, q).length,
+    },
+  };
+  cache.set(cacheKey, { ts: Date.now(), data: payload });
   return payload;
 }
 
@@ -190,6 +217,33 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, data);
     } catch (error) {
       return json(res, 500, { error: 'search_failed', message: error.message });
+    }
+  }
+
+  if (reqUrl.pathname === '/api/fanqie/debug' && req.method === 'GET') {
+    try {
+      const query = reqUrl.searchParams.get('q') || '';
+      const q = sanitizeQuery(query);
+      const url = q ? `https://fanqienovel.com/search/${encodeURIComponent(q)}` : 'https://fanqienovel.com/search/%E5%85%A8%E7%BD%91%E6%90%9C%E7%B4%A2';
+      const resp = await fetch(url, {
+        headers: {
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+          'accept-language': 'zh-CN,zh;q=0.9',
+          'referer': 'https://fanqienovel.com/',
+        },
+      });
+      const html = await resp.text();
+      const state = parseState(html);
+      return json(res, 200, {
+        requestedUrl: url,
+        httpStatus: resp.status,
+        contentLength: html.length,
+        hasInitialState: Boolean(state),
+        stateSummary: summarizeState(state),
+        sample: html.slice(0, 2000),
+      });
+    } catch (error) {
+      return json(res, 500, { error: 'debug_failed', message: error.message });
     }
   }
 
