@@ -7,6 +7,7 @@ const SEARCH_DEBOUNCE_MS = 220;
 
 let selectedIds = [];
 let supabaseClient = null;
+let allBooks = [];
 let books = [];
 let searchTimer = null;
 let searchSeq = 0;
@@ -65,25 +66,22 @@ function normalizeBook(item) {
   };
 }
 
-async function loadBooksFromSupabase(query = '') {
+async function loadBooksFromSupabase() {
   const client = getSupabaseClient();
-  let request = client.from(TABLE_NAME).select('*').order('created_at', { ascending: false });
-
-  const q = query.trim();
-  if (q) {
-    const pattern = `%${q}%`;
-    request = request.or([
-      `title.ilike.${pattern}`,
-      `author.ilike.${pattern}`,
-      `resource_url.ilike.${pattern}`,
-      `resource_label.ilike.${pattern}`,
-    ].join(','));
-  }
-
-  const { data, error } = await request;
+  const { data, error } = await client.from(TABLE_NAME).select('*').order('created_at', { ascending: false });
   if (error) throw error;
-  books = (data || []).map(normalizeBook);
-  return books;
+  allBooks = (data || []).map(normalizeBook);
+  return allBooks;
+}
+
+function applyLocalSearch(query = '') {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...allBooks];
+
+  return allBooks.filter((book) => {
+    const haystack = [book.title, book.author, book.resourceUrl, book.resourceLabel].join(' ').toLowerCase();
+    return haystack.includes(q);
+  });
 }
 
 function setSearchStatus(message) {
@@ -99,29 +97,39 @@ function renderBooks(list, query = '') {
   els.bookList.innerHTML = list.length
     ? list.map((book) => {
         const title = escapeHtml(book.title);
-        const author = escapeHtml(book.author);
-        const label = escapeHtml(book.resourceLabel || '蓝奏云链接填写');
+        const author = escapeHtml(book.author || '未知作者');
         const href = escapeHtml(book.resourceUrl || '');
-        return `<article class="result-item" data-id="${escapeHtml(book.id)}"><h3>${title}</h3><p>作者 / ${author}</p>${href ? `<p><a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a></p>` : ''}${q ? `<p class="hint">匹配词：${escapeHtml(q)}</p>` : ''}</article>`;
+        const intro = escapeHtml(book.intro || '');
+        const cover = book.cover ? `<img class="book-cover" src="${escapeHtml(book.cover)}" alt="${title}" loading="lazy" />` : '';
+        return `<article class="result-item" data-id="${escapeHtml(book.id)}">${cover}<div class="book-meta"><h3>${title}</h3><p>作者 / ${author}</p>${intro ? `<p class="intro">${intro}</p>` : ''}${href ? `<p><a href="${href}" target="_blank" rel="noopener noreferrer">查看番茄原文</a></p>` : ''}${q ? `<p class="hint">搜索词：${escapeHtml(q)}</p>` : ''}</div></article>`;
       }).join('')
-    : '<article class="result-item"><p>没有找到内容</p></article>';
+    : '<article class="result-item"><p>没有找到番茄结果</p></article>';
 }
 
 async function runLiveSearch() {
   const query = currentQuery();
   const seq = ++searchSeq;
   lastQuery = query;
-  setSearchStatus(query ? '正在实时搜索…' : '显示全部资源');
+  setSearchStatus(query ? '正在实时搜索番茄小说…' : '请输入书名开始搜索');
 
   try {
-    await loadBooksFromSupabase(query);
+    const resp = await fetch(`/api/fanqie/search?q=${encodeURIComponent(query)}`);
+    const data = await resp.json();
     if (seq !== searchSeq) return;
+    if (!resp.ok) throw new Error(data?.message || '搜索失败');
+    books = (data.results || []).map((item, index) => ({
+      id: item.url || `${item.title}-${index}`,
+      title: item.title || '',
+      author: item.author || '',
+      resourceUrl: item.url || '',
+      resourceLabel: '查看番茄结果',
+    }));
     renderBooks(books, query);
-    setSearchStatus(query ? `已找到 ${books.length} 条结果` : `共 ${books.length} 条资源`);
+    setSearchStatus(query ? `已找到 ${books.length} 条番茄结果` : '请输入书名开始搜索');
   } catch (error) {
     if (seq !== searchSeq) return;
     console.error(error);
-    setSearchStatus('搜索失败，已切换为空结果');
+    setSearchStatus('番茄搜索失败');
     books = [];
     renderBooks([]);
   }
@@ -263,7 +271,8 @@ async function deleteSelectedBooks() {
 }
 
 async function refreshBooks() {
-  await loadBooksFromSupabase(lastQuery);
+  await loadBooksFromSupabase();
+  books = applyLocalSearch(lastQuery);
   renderBooks(books, lastQuery);
   setSearchStatus(lastQuery ? `已找到 ${books.length} 条结果` : `共 ${books.length} 条资源`);
   if (localStorage.getItem(ADMIN_KEY) === '1') renderAdminBooks();
@@ -297,6 +306,7 @@ els.deleteSelectedBtn.addEventListener('click', deleteSelectedBooks);
     await refreshBooks();
   } catch (error) {
     console.error(error);
+    allBooks = [];
     books = [];
     renderBooks([]);
     setSearchStatus('资源加载失败');
