@@ -140,16 +140,7 @@ function renderPage(user) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>会员专属个人站</title>
-  <style>
-    *{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#f7e7ef,#e9f5ff);color:#24324a}
-    .wrap{max-width:1100px;margin:0 auto;padding:24px} .hero,.card{background:rgba(255,255,255,.78);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.7);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(57,78,106,.08);margin-bottom:16px}
-    .hero{display:flex;justify-content:space-between;align-items:center;gap:16px} .badge{padding:10px 14px;border-radius:999px;background:#1f7ae0;color:#fff;font-weight:700}
-    .auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px} .panel{display:grid;gap:10px;padding:14px;border:1px solid #e5ebf3;border-radius:16px;background:#fff}
-    input,button{padding:12px 14px;border-radius:12px;border:1px solid #d6dde8;font:inherit} button{cursor:pointer} .primary{background:#1f7ae0;color:#fff;border-color:#1f7ae0} .ghost{background:#fff;color:#1f7ae0}
-    .msg{padding:10px 12px;border-radius:12px}.msg.error{background:#ffe8e8;color:#b42318}.msg.success{background:#e9fbe9;color:#137333}.msg.info{background:#edf4ff;color:#1d4ed8}
-    .user-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid #eef2f7;align-items:center}.row-actions{display:flex;gap:10px}.hidden{display:none}
-    @media (max-width: 760px){ .auth-grid,.hero{grid-template-columns:1fr;display:grid}.hero{justify-content:stretch} .user-row{flex-direction:column;align-items:flex-start} }
-  </style>
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <main class="wrap">
@@ -166,9 +157,7 @@ function renderPage(user) {
     <section class="card hidden" id="adminCard"></section>
   </main>
   <script>window.__AUTH__=${authJson};</script>
-  <script>
-${escapeHtml ? '' : ''}
-  </script>
+  <script src="/script.js"></script>
 </body>
 </html>`;
 }
