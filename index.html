@@ -21,9 +21,17 @@
       <section id="dashboardCard" class="shell hidden"></section>
       <section id="adminCard" class="shell hidden"></section>
     </main>
+    <noscript>
+      <main class="page">
+        <section class="shell">
+          <h2>需要启用 JavaScript</h2>
+          <p>这个站点的登录、注册和审核功能需要浏览器开启 JavaScript 才能使用。</p>
+        </section>
+      </main>
+    </noscript>
     <script>
       window.__AUTH__ = { loggedIn: false, username: '', role: '', status: '' };
     </script>
-    <script src="script.js"></script>
+    <script src="./script.js"></script>
   </body>
 </html>
