@@ -1,325 +1,181 @@
-const ADMIN_PASSWORD = '663666';
-const SUPABASE_URL = 'https://kbiwuphjvejhogxhzdug.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_HYSdxuODVwR6GKlla7fcMg_o0h8-aJ6';
-const TABLE_NAME = 'resources';
-const ADMIN_KEY = 'novel_admin_unlocked';
-const SEARCH_DEBOUNCE_MS = 220;
-const ADMIN_UNLOCKED_THIS_SESSION = 'novel_admin_session_unlocked';
+const state = window.__AUTH__ || { loggedIn: false, username: '', role: '', status: '' };
 
-let selectedIds = [];
-let supabaseClient = null;
-let allBooks = [];
-let books = [];
-let searchTimer = null;
-let searchSeq = 0;
-let lastQuery = '';
-
-const els = {
-  searchInput: document.getElementById('searchInput'),
-  searchBtn: document.getElementById('searchBtn'),
-  searchStatus: document.getElementById('searchStatus'),
-  bookList: document.getElementById('bookList'),
-  unlockAdminBtn: document.getElementById('unlockAdminBtn'),
-  admin: document.getElementById('admin'),
-  adminLocked: document.getElementById('adminLocked'),
-  adminPanel: document.getElementById('adminPanel'),
-  adminPasswordInput: document.getElementById('dialogPasswordInput'),
-  dialogSubmitBtn: document.getElementById('dialogSubmitBtn'),
-  dialogCancelBtn: document.getElementById('dialogCancelBtn'),
-  passwordDialog: document.getElementById('passwordDialog'),
-  lockAdminBtn: document.getElementById('lockAdminBtn'),
-  newTitle: document.getElementById('newTitle'),
-  newAuthor: document.getElementById('newAuthor'),
-  newResourceUrl: document.getElementById('newResourceUrl'),
-  newResourceLabel: document.getElementById('newResourceLabel'),
-  addBookBtn: document.getElementById('addBookBtn'),
-  saveJsonBtn: document.getElementById('saveJsonBtn'),
-  downloadJsonBtn: document.getElementById('downloadJsonBtn'),
-  selectAllAdminBtn: document.getElementById('selectAllAdminBtn'),
-  clearSelectionBtn: document.getElementById('clearSelectionBtn'),
-  deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
-  adminBookList: document.getElementById('adminBookList'),
-};
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === 'className') node.className = value;
+    else if (key === 'text') node.textContent = value;
+    else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2), value);
+    else node.setAttribute(key, value);
+  }
+  for (const child of children) node.append(child);
+  return node;
 }
 
-function getSupabaseClient() {
-  if (supabaseClient) return supabaseClient;
-  if (!window.supabase) throw new Error('Supabase 客户端未加载');
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  return supabaseClient;
+function showMessage(text, type = 'info') {
+  return el('div', { className: `msg ${type}`, text });
 }
 
-function normalizeBook(item) {
-  return {
-    id: item.id,
-    title: item.title || '',
-    author: item.author || '',
-    resourceUrl: item.resource_url || item.resourceUrl || '',
-    resourceLabel: item.resource_label || item.resourceLabel || '蓝奏云链接填写',
-  };
+async function api(url, method = 'GET', body) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '请求失败');
+  return data;
 }
 
-async function loadBooksFromSupabase() {
-  const client = getSupabaseClient();
-  const { data, error } = await client.from(TABLE_NAME).select('*').order('created_at', { ascending: false });
-  if (error) throw error;
-  allBooks = (data || []).map(normalizeBook);
-  return allBooks;
+function renderAuthCard() {
+  const card = document.getElementById('authCard');
+  card.innerHTML = '';
+
+  if (state.loggedIn) {
+    card.append(
+      el('h2', { text: `欢迎，${state.username}` }),
+      el('p', { text: state.role === 'admin' ? '你已进入管理员模式。' : `账号状态：${state.status}` }),
+      el('button', {
+        text: '进入内部页面',
+        className: 'primary',
+        onclick: () => {
+          document.getElementById('dashboardCard').classList.remove('hidden');
+          document.getElementById('dashboardCard').scrollIntoView({ behavior: 'smooth' });
+          renderDashboard();
+        },
+      }),
+      el('button', {
+        text: '退出登录',
+        className: 'ghost',
+        onclick: async () => {
+          await api('/api/logout', 'POST');
+          location.reload();
+        },
+      })
+    );
+    return;
+  }
+
+  const title = el('h2', { text: '登录 / 注册' });
+  const formWrap = el('div', { className: 'auth-grid' });
+
+  const loginForm = el('form', { className: 'panel' });
+  loginForm.append(
+    el('h3', { text: '登录' }),
+    el('input', { placeholder: '用户名', name: 'username', required: 'required' }),
+    el('input', { placeholder: '密码', name: 'password', type: 'password', required: 'required' }),
+    el('button', { text: '登录', className: 'primary', type: 'submit' })
+  );
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(loginForm);
+    try {
+      await api('/api/login', 'POST', { username: fd.get('username'), password: fd.get('password') });
+      location.reload();
+    } catch (err) {
+      loginForm.querySelector('.notice')?.remove();
+      loginForm.append(showMessage(err.message, 'error'));
+    }
+  });
+
+  const regForm = el('form', { className: 'panel' });
+  regForm.append(
+    el('h3', { text: '注册' }),
+    el('input', { placeholder: '用户名', name: 'username', required: 'required' }),
+    el('input', { placeholder: '密码', name: 'password', type: 'password', required: 'required' }),
+    el('button', { text: '提交注册', className: 'primary', type: 'submit' })
+  );
+  regForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(regForm);
+    try {
+      const result = await api('/api/register', 'POST', { username: fd.get('username'), password: fd.get('password') });
+      regForm.querySelector('.notice')?.remove();
+      regForm.append(showMessage(result.message, 'success'));
+    } catch (err) {
+      regForm.querySelector('.notice')?.remove();
+      regForm.append(showMessage(err.message, 'error'));
+    }
+  });
+
+  formWrap.append(loginForm, regForm);
+  card.append(title, formWrap);
 }
 
-function applyLocalSearch(query = '') {
-  const q = query.trim().toLowerCase();
-  if (!q) return [...allBooks];
+async function renderDashboard() {
+  const card = document.getElementById('dashboardCard');
+  card.innerHTML = '';
+  card.append(el('h2', { text: '内部页面' }));
+  card.append(el('p', { text: '只有审核通过的账号才能看到这里。' }));
+  card.append(el('p', { text: `当前账号：${state.username || '未登录'}` }));
+  card.classList.remove('hidden');
 
-  return allBooks.filter((book) => {
-    const haystack = [book.title, book.author, book.resourceUrl, book.resourceLabel].join(' ').toLowerCase();
-    return haystack.includes(q);
+  if (state.role === 'admin') {
+    card.append(el('p', { text: '你是管理员，可以进入审核后台。' }));
+    const btn = el('button', { text: '打开审核后台', className: 'primary' });
+    btn.onclick = async () => {
+      document.getElementById('adminCard').classList.remove('hidden');
+      await renderAdmin();
+    };
+    card.append(btn);
+  }
+}
+
+async function renderAdmin() {
+  const card = document.getElementById('adminCard');
+  card.innerHTML = '';
+  card.append(el('h2', { text: '管理员审核后台' }));
+  const list = el('div', { className: 'user-list', text: '加载中…' });
+  card.append(list);
+  const data = await api('/api/admin/users');
+  list.innerHTML = '';
+  if (!data.users.length) {
+    list.append(el('p', { text: '暂无待审核用户。' }));
+    return;
+  }
+  data.users.forEach((u) => {
+    const row = el('div', { className: 'user-row' });
+    row.append(
+      el('div', {}, [el('strong', { text: u.username }), el('div', { text: `${u.status} · ${new Date(u.createdAt).toLocaleString()}` })]),
+      el('div', { className: 'row-actions' }, [
+        el('button', {
+          text: '通过',
+          className: 'primary',
+          onclick: async () => {
+            await api('/api/admin/review', 'POST', { userId: u.id, status: 'approved' });
+            renderAdmin();
+          },
+        }),
+        el('button', {
+          text: '拒绝',
+          className: 'ghost',
+          onclick: async () => {
+            await api('/api/admin/review', 'POST', { userId: u.id, status: 'rejected' });
+            renderAdmin();
+          },
+        }),
+      ])
+    );
+    list.append(row);
   });
 }
 
-function setSearchStatus(message) {
-  if (els.searchStatus) els.searchStatus.textContent = message;
+function injectStyles() {
+  const css = `
+    *{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#f7e7ef,#e9f5ff);color:#24324a}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px} .hero,.card{background:rgba(255,255,255,.78);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.7);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(57,78,106,.08);margin-bottom:16px}
+    .hero{display:flex;justify-content:space-between;align-items:center;gap:16px} .badge{padding:10px 14px;border-radius:999px;background:#1f7ae0;color:#fff;font-weight:700}
+    .auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px} .panel{display:grid;gap:10px;padding:14px;border:1px solid #e5ebf3;border-radius:16px;background:#fff}
+    input,button{padding:12px 14px;border-radius:12px;border:1px solid #d6dde8;font:inherit} button{cursor:pointer} .primary{background:#1f7ae0;color:#fff;border-color:#1f7ae0} .ghost{background:#fff;color:#1f7ae0}
+    .msg{padding:10px 12px;border-radius:12px}.msg.error{background:#ffe8e8;color:#b42318}.msg.success{background:#e9fbe9;color:#137333}.msg.info{background:#edf4ff;color:#1d4ed8}
+    .user-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid #eef2f7;align-items:center}.row-actions{display:flex;gap:10px}.hidden{display:none}
+    @media (max-width: 760px){ .auth-grid,.hero{grid-template-columns:1fr;display:grid}.hero{justify-content:stretch} .user-row{flex-direction:column;align-items:flex-start} }
+  `;
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
 }
 
-function currentQuery() {
-  return els.searchInput.value.trim();
-}
-
-function renderBooks(list, query = '') {
-  const q = query.trim();
-  els.bookList.innerHTML = list.length
-    ? list.map((book) => {
-        const title = escapeHtml(book.title);
-        const author = escapeHtml(book.author || '未知作者');
-        const href = escapeHtml(book.resourceUrl || '');
-        const intro = escapeHtml(book.intro || '');
-        const cover = book.cover ? `<img class="book-cover" src="${escapeHtml(book.cover)}" alt="${title}" loading="lazy" />` : '';
-        return `<article class="result-item" data-id="${escapeHtml(book.id)}">${cover}<div class="book-meta"><h3>${title}</h3><p>作者 / ${author}</p>${intro ? `<p class="intro">${intro}</p>` : ''}${href ? `<p><a href="${href}" target="_blank" rel="noopener noreferrer">查看番茄原文</a></p>` : ''}${q ? `<p class="hint">搜索词：${escapeHtml(q)}</p>` : ''}</div></article>`;
-      }).join('')
-    : '<article class="result-item"><p>没有找到番茄结果</p></article>';
-}
-
-async function runLiveSearch() {
-  const query = currentQuery();
-  const seq = ++searchSeq;
-  lastQuery = query;
-  setSearchStatus(query ? '正在实时搜索番茄小说…' : '请输入书名开始搜索');
-
-  try {
-    const resp = await fetch(`/api/fanqie/search?q=${encodeURIComponent(query)}`);
-    const data = await resp.json();
-    if (seq !== searchSeq) return;
-    if (!resp.ok) throw new Error(data?.message || `HTTP ${resp.status}`);
-    books = (data.results || []).map((item, index) => ({
-      id: item.url || `${item.title}-${index}`,
-      title: item.title || '',
-      author: item.author || '',
-      resourceUrl: item.url || '',
-      resourceLabel: '查看番茄结果',
-      intro: item.intro || '',
-      cover: item.cover || '',
-    }));
-    renderBooks(books, query);
-    setSearchStatus(query ? `已找到 ${books.length} 条番茄结果` : '请输入书名开始搜索');
-  } catch (error) {
-    if (seq !== searchSeq) return;
-    console.error(error);
-    setSearchStatus(`番茄搜索失败：${error.message || '未知错误'}`);
-    books = [];
-    renderBooks([]);
-  }
-}
-
-function scheduleSearch() {
-  window.clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(runLiveSearch, SEARCH_DEBOUNCE_MS);
-}
-
-function showAdminPanel() {
-  els.admin.classList.remove('hidden');
-  els.admin.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function openPasswordDialog() {
-  if (els.passwordDialog?.showModal) {
-    els.adminPasswordInput.value = '';
-    els.passwordDialog.showModal();
-    els.adminPasswordInput.focus();
-  }
-}
-
-function unlockAdmin(password) {
-  if ((password || '').trim() !== ADMIN_PASSWORD) {
-    alert('密码错误');
-    return false;
-  }
-  sessionStorage.setItem(ADMIN_UNLOCKED_THIS_SESSION, '1');
-  localStorage.removeItem(ADMIN_KEY);
-  els.admin.classList.remove('hidden');
-  els.adminLocked.classList.add('hidden');
-  els.adminPanel.classList.remove('hidden');
-  renderAdminBooks();
-  return true;
-}
-
-function lockAdmin() {
-  sessionStorage.removeItem(ADMIN_UNLOCKED_THIS_SESSION);
-  localStorage.removeItem(ADMIN_KEY);
-  selectedIds = [];
-  els.admin.classList.add('hidden');
-  els.adminPanel.classList.add('hidden');
-  els.adminLocked.classList.remove('hidden');
-}
-
-function renderAdminBooks() {
-  els.adminBookList.innerHTML = books.length
-    ? books.map((book) => {
-        const selected = selectedIds.includes(book.id) ? 'selected' : '';
-        const title = escapeHtml(book.title);
-        const author = escapeHtml(book.author);
-        const label = escapeHtml(book.resourceLabel || '蓝奏云链接填写');
-        const href = escapeHtml(book.resourceUrl || '');
-        return `<article class="result-item ${selected}" data-id="${escapeHtml(book.id)}"><h3>${title}</h3><p>作者 / ${author}</p>${href ? `<p><a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a></p>` : ''}<div class="actions"><button type="button" data-action="select">选择</button><button type="button" data-action="edit">编辑</button><button type="button" data-action="delete">删除</button></div></article>`;
-      }).join('')
-    : '<article class="result-item"><p>暂无资源</p></article>';
-
-  els.adminBookList.querySelectorAll('[data-action="select"]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = Number(btn.closest('[data-id]').dataset.id);
-      selectedIds = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
-      renderAdminBooks();
-    });
-  });
-
-  els.adminBookList.querySelectorAll('[data-action="edit"]').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const id = Number(btn.closest('[data-id]').dataset.id);
-      const book = books.find((b) => b.id === id);
-      if (!book) return;
-      const title = prompt('书名', book.title);
-      const author = prompt('作者', book.author);
-      const resourceUrl = prompt('链接', book.resourceUrl || '');
-      const resourceLabel = prompt('按钮文字', book.resourceLabel || '蓝奏云链接填写');
-      const client = getSupabaseClient();
-      const payload = {
-        title: title ?? book.title,
-        author: author ?? book.author,
-        resource_url: resourceUrl ?? book.resourceUrl,
-        resource_label: resourceLabel ?? book.resourceLabel,
-      };
-      const { error } = await client.from(TABLE_NAME).update(payload).eq('id', id);
-      if (error) return alert(`更新失败：${error.message}`);
-      await refreshBooks();
-    });
-  });
-
-  els.adminBookList.querySelectorAll('[data-action="delete"]').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const id = Number(btn.closest('[data-id]').dataset.id);
-      const client = getSupabaseClient();
-      const { error } = await client.from(TABLE_NAME).delete().eq('id', id);
-      if (error) return alert(`删除失败：${error.message}`);
-      selectedIds = selectedIds.filter((x) => x !== id);
-      await refreshBooks();
-    });
-  });
-}
-
-async function addBook() {
-  const title = els.newTitle.value.trim();
-  const author = els.newAuthor.value.trim();
-  const resourceUrl = els.newResourceUrl.value.trim();
-  const resourceLabel = els.newResourceLabel.value.trim() || '蓝奏云链接填写';
-  if (!title || !author) return alert('书名和作者不能为空');
-  const client = getSupabaseClient();
-  const { error } = await client.from(TABLE_NAME).insert([{ title, author, resource_url: resourceUrl, resource_label: resourceLabel }]);
-  if (error) return alert(`添加失败：${error.message}`);
-  els.newTitle.value = '';
-  els.newAuthor.value = '';
-  els.newResourceUrl.value = '';
-  els.newResourceLabel.value = '';
-  await refreshBooks();
-}
-
-async function saveJson() {
-  alert('数据已直接保存到 Supabase，无需再导出 JSON。');
-}
-
-function downloadJson() {
-  const blob = new Blob([JSON.stringify(books, null, 2)], { type: 'application/json;charset=UTF-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'books.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-async function deleteSelectedBooks() {
-  if (!selectedIds.length) return alert('请先选择要删除的作品');
-  const client = getSupabaseClient();
-  const { error } = await client.from(TABLE_NAME).delete().in('id', selectedIds);
-  if (error) return alert(`删除失败：${error.message}`);
-  selectedIds = [];
-  await refreshBooks();
-}
-
-async function refreshBooks() {
-  await loadBooksFromSupabase();
-  books = applyLocalSearch(lastQuery);
-  renderBooks(books, lastQuery);
-  setSearchStatus(lastQuery ? `已找到 ${books.length} 条结果` : `共 ${books.length} 条资源`);
-  if (localStorage.getItem(ADMIN_KEY) === '1') renderAdminBooks();
-}
-
-els.searchInput.addEventListener('input', scheduleSearch);
-els.searchBtn.addEventListener('click', runLiveSearch);
-els.searchInput.addEventListener('search', runLiveSearch);
-els.unlockAdminBtn.addEventListener('click', openPasswordDialog);
-els.dialogCancelBtn.addEventListener('click', () => els.passwordDialog?.close());
-els.dialogSubmitBtn.addEventListener('click', () => {
-  const ok = unlockAdmin(els.adminPasswordInput.value);
-  if (ok && els.passwordDialog?.open) els.passwordDialog.close();
-});
-els.lockAdminBtn.addEventListener('click', lockAdmin);
-els.addBookBtn.addEventListener('click', addBook);
-els.saveJsonBtn.addEventListener('click', saveJson);
-els.downloadJsonBtn.addEventListener('click', downloadJson);
-els.selectAllAdminBtn.addEventListener('click', () => {
-  selectedIds = books.map((book) => book.id);
-  renderAdminBooks();
-});
-els.clearSelectionBtn.addEventListener('click', () => {
-  selectedIds = [];
-  renderAdminBooks();
-});
-els.deleteSelectedBtn.addEventListener('click', deleteSelectedBooks);
-
-(async () => {
-  try {
-    await refreshBooks();
-  } catch (error) {
-    console.error(error);
-    allBooks = [];
-    books = [];
-    renderBooks([]);
-    setSearchStatus('资源加载失败');
-  }
-  if (sessionStorage.getItem(ADMIN_UNLOCKED_THIS_SESSION) === '1') {
-    els.admin.classList.remove('hidden');
-    els.adminLocked.classList.add('hidden');
-    els.adminPanel.classList.remove('hidden');
-    renderAdminBooks();
-  }
-})();
+injectStyles();
+renderAuthCard();
+if (state.loggedIn) renderDashboard();

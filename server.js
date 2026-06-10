@@ -1,7 +1,8 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,257 +10,245 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
 const ROOT = __dirname;
-const RATE_LIMIT_WINDOW_MS = 15_000;
-const RATE_LIMIT_MAX = 20;
-const CACHE_TTL_MS = 30_000;
-const requestLog = new Map();
-const cache = new Map();
+const DATA_DIR = path.join(ROOT, 'data');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const SESSION_FILE = path.join(DATA_DIR, 'sessions.json');
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
 };
+
+let users = [];
+let sessions = [];
+
+async function ensureStorage() {
+  await mkdir(DATA_DIR, { recursive: true });
+  try { users = JSON.parse(await readFile(USERS_FILE, 'utf8')); } catch { users = []; }
+  try { sessions = JSON.parse(await readFile(SESSION_FILE, 'utf8')); } catch { sessions = []; }
+  if (!users.some((u) => u.role === 'admin')) {
+    users.push({
+      id: crypto.randomUUID(),
+      username: ADMIN_USERNAME,
+      passwordHash: hashPassword(ADMIN_PASSWORD),
+      role: 'admin',
+      status: 'approved',
+      createdAt: new Date().toISOString(),
+    });
+    await saveUsers();
+  }
+}
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(String(password)).digest('hex');
+}
+
+async function saveUsers() {
+  await writeFile(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+}
+
+async function saveSessions() {
+  await writeFile(SESSION_FILE, JSON.stringify(sessions, null, 2), 'utf8');
+}
 
 function send(res, status, body, headers = {}) {
   res.writeHead(status, headers);
   res.end(body);
 }
 
-function json(res, status, data, headers = {}) {
+function json(res, status, data) {
   send(res, status, JSON.stringify(data), {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    ...headers,
   });
 }
 
 function text(res, status, body, headers = {}) {
-  send(res, status, body, {
-    'Content-Type': 'text/plain; charset=utf-8',
-    ...headers,
+  send(res, status, body, { 'Content-Type': 'text/plain; charset=utf-8', ...headers });
+}
+
+function parseCookies(cookieHeader = '') {
+  return Object.fromEntries(cookieHeader.split(';').map((c) => c.trim()).filter(Boolean).map((pair) => {
+    const idx = pair.indexOf('=');
+    return [decodeURIComponent(pair.slice(0, idx)), decodeURIComponent(pair.slice(idx + 1))];
+  }).filter(([k]) => k));
+}
+
+function getCurrentSession(req) {
+  const cookies = parseCookies(req.headers.cookie || '');
+  const sid = cookies.sid;
+  if (!sid) return null;
+  return sessions.find((s) => s.sid === sid && s.expiresAt > Date.now()) || null;
+}
+
+function getUserFromReq(req) {
+  const session = getCurrentSession(req);
+  if (!session) return null;
+  return users.find((u) => u.id === session.userId) || null;
+}
+
+function setSession(res, userId) {
+  const sid = crypto.randomUUID();
+  sessions.push({ sid, userId, expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 7 });
+  return saveSessions().then(() => {
+    res.setHeader('Set-Cookie', `sid=${encodeURIComponent(sid)}; Path=/; HttpOnly; SameSite=Lax`);
   });
 }
 
-function rateLimited(ip) {
-  const now = Date.now();
-  const logs = requestLog.get(ip) || [];
-  const fresh = logs.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
-  fresh.push(now);
-  requestLog.set(ip, fresh);
-  return fresh.length > RATE_LIMIT_MAX;
+async function clearSession(req, res) {
+  const cookies = parseCookies(req.headers.cookie || '');
+  const sid = cookies.sid;
+  if (sid) {
+    sessions = sessions.filter((s) => s.sid !== sid);
+    await saveSessions();
+  }
+  res.setHeader('Set-Cookie', 'sid=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax');
 }
 
-function sanitizeQuery(q = '') {
-  return String(q).trim().slice(0, 80);
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => { data += chunk; if (data.length > 1e6) req.destroy(); });
+    req.on('end', () => {
+      try { resolve(JSON.parse(data || '{}')); } catch { resolve({}); }
+    });
+    req.on('error', reject);
+  });
 }
 
-function cleanText(input) {
-  return String(input || '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+function renderPage(user) {
+  const authJson = JSON.stringify({
+    loggedIn: Boolean(user),
+    username: user?.username || '',
+    role: user?.role || '',
+    status: user?.status || '',
+  });
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>会员专属个人站</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <h1>会员专属个人站</h1>
+        <p>注册后需要管理员审核，审核通过才能登录进入内部页面。</p>
+      </div>
+      <div class="badge">安全访问</div>
+    </section>
+
+    <section class="card" id="authCard"></section>
+    <section class="card hidden" id="dashboardCard"></section>
+    <section class="card hidden" id="adminCard"></section>
+  </main>
+  <script>window.__AUTH__=${authJson};</script>
+  <script src="/script.js"></script>
+</body>
+</html>`;
 }
 
-function parseState(html) {
-  const match = html.match(/window\.__INITIAL_STATE__=(\{[\s\S]*?\})\s*<\/script>/);
-  if (!match) return null;
+async function handleApi(req, res, pathname) {
+  const body = req.method === 'POST' ? await readBody(req) : {};
+
+  if (pathname === '/api/me' && req.method === 'GET') {
+    const user = getUserFromReq(req);
+    return json(res, 200, { user: user ? { username: user.username, role: user.role, status: user.status } : null });
+  }
+
+  if (pathname === '/api/register' && req.method === 'POST') {
+    const username = String(body.username || '').trim();
+    const password = String(body.password || '').trim();
+    if (!username || !password) return json(res, 400, { error: '用户名和密码不能为空' });
+    if (users.some((u) => u.username === username)) return json(res, 400, { error: '用户名已存在' });
+    users.push({
+      id: crypto.randomUUID(),
+      username,
+      passwordHash: hashPassword(password),
+      role: 'user',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+    await saveUsers();
+    return json(res, 200, { ok: true, message: '注册成功，请等待管理员审核' });
+  }
+
+  if (pathname === '/api/login' && req.method === 'POST') {
+    const username = String(body.username || '').trim();
+    const password = String(body.password || '').trim();
+    const user = users.find((u) => u.username === username);
+    if (!user) return json(res, 400, { error: '账号不存在' });
+    if (user.passwordHash !== hashPassword(password)) return json(res, 400, { error: '密码错误' });
+    if (user.status !== 'approved' && user.role !== 'admin') return json(res, 403, { error: '账号未通过审核' });
+    await setSession(res, user.id);
+    return json(res, 200, { ok: true, user: { username: user.username, role: user.role, status: user.status } });
+  }
+
+  if (pathname === '/api/logout' && req.method === 'POST') {
+    await clearSession(req, res);
+    return json(res, 200, { ok: true });
+  }
+
+  const current = getUserFromReq(req);
+  if (!current) return json(res, 401, { error: '未登录' });
+
+  if (pathname === '/api/admin/users' && req.method === 'GET') {
+    if (current.role !== 'admin') return json(res, 403, { error: '无权限' });
+    const list = users.filter((u) => u.role !== 'admin').map((u) => ({ id: u.id, username: u.username, status: u.status, createdAt: u.createdAt }));
+    return json(res, 200, { users: list });
+  }
+
+  if (pathname === '/api/admin/review' && req.method === 'POST') {
+    if (current.role !== 'admin') return json(res, 403, { error: '无权限' });
+    const { userId, status } = body;
+    if (!['approved', 'rejected'].includes(status)) return json(res, 400, { error: '状态错误' });
+    const target = users.find((u) => u.id === userId && u.role !== 'admin');
+    if (!target) return json(res, 404, { error: '用户不存在' });
+    target.status = status;
+    await saveUsers();
+    return json(res, 200, { ok: true });
+  }
+
+  return json(res, 404, { error: 'Not Found' });
+}
+
+async function serveStatic(res, filePath) {
   try {
-    return JSON.parse(match[1]);
+    const buf = await readFile(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    send(res, 200, buf, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
   } catch {
-    return null;
+    text(res, 404, 'Not Found');
   }
 }
 
-function summarizeState(state) {
-  return {
-    topLevelKeys: state ? Object.keys(state).slice(0, 20) : [],
-    searchKeys: state?.search ? Object.keys(state.search).slice(0, 20) : [],
-    searchBookListType: Array.isArray(state?.search?.searchBookList) ? 'array' : typeof state?.search?.searchBookList,
-    searchBookListCount: Array.isArray(state?.search?.searchBookList) ? state.search.searchBookList.length : 0,
-    authorDataType: Array.isArray(state?.search?.authorData) ? 'array' : typeof state?.search?.authorData,
-    authorDataCount: Array.isArray(state?.search?.authorData) ? state.search.authorData.length : 0,
-  };
-}
-
-function normalizeItem(item) {
-  const title = cleanText(item.bookName || item.title || item.name || '');
-  const author = cleanText(item.authorName || item.author || item.nickName || '');
-  const url = item.bookUrl || item.url || item.link || item.jumpUrl || item.pageUrl || '';
-  const cover = item.coverUrl || item.cover || item.imgUrl || '';
-  const intro = cleanText(item.bookDesc || item.intro || item.description || '');
-  return { title, author, url, cover, intro, source: 'fanqie' };
-}
-
-function extractFromState(state, query) {
-  const out = [];
-  const seen = new Set();
-  const lists = [
-    state?.search?.searchBookList,
-    state?.search?.authorData,
-    state?.search?.bookList,
-    state?.search?.list,
-  ].filter(Array.isArray);
-
-  for (const list of lists) {
-    for (const item of list) {
-      const book = normalizeItem(item);
-      const key = `${book.title}|${book.author}|${book.url}`;
-      if (!book.title || seen.has(key)) continue;
-      if (query && !`${book.title} ${book.author} ${book.intro}`.toLowerCase().includes(query.toLowerCase())) continue;
-      seen.add(key);
-      out.push(book);
-      if (out.length >= 20) return out;
-    }
-  }
-
-  return out;
-}
-
-function extractFallback(html, query) {
-  const results = [];
-  const seen = new Set();
-  const cardRegex = /<a[^>]+href="(\/page\/\d+)"[\s\S]*?<\/a>/g;
-  let match;
-  while ((match = cardRegex.exec(html)) !== null) {
-    const block = match[0];
-    const href = `https://fanqienovel.com${match[1]}`;
-    if (seen.has(href)) continue;
-    const title = cleanText((block.match(/title="([^"]+)"/) || block.match(/>([^<]{2,80})<\/a>/) || [,''])[1]);
-    const author = cleanText((block.match(/作者[：:]?\s*([^<\n]{1,60})/) || [,''])[1]);
-    const intro = cleanText((block.match(/<p[^>]*>([^<]{10,200})<\/p>/) || [,''])[1]);
-    if (!title) continue;
-    if (query && !`${title} ${author} ${intro}`.toLowerCase().includes(query.toLowerCase())) continue;
-    seen.add(href);
-    results.push({ title, author, url: href, cover: '', intro, source: 'fanqie' });
-    if (results.length >= 20) break;
-  }
-  return results;
-}
-
-async function searchFanqie(query) {
-  const q = sanitizeQuery(query);
-  const cacheKey = q || '__all__';
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
-
-  const url = q ? `https://fanqienovel.com/search/${encodeURIComponent(q)}` : 'https://fanqienovel.com/search/%E5%85%A8%E7%BD%91%E6%90%9C%E7%B4%A2';
-  const resp = await fetch(url, {
-    headers: {
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-      'accept-language': 'zh-CN,zh;q=0.9',
-      'referer': 'https://fanqienovel.com/',
-    },
-  });
-  const html = await resp.text();
-  const state = parseState(html);
-  const extracted = [];
-  if (state) extracted.push(...extractFromState(state, q));
-  extracted.push(...extractFallback(html, q));
-
-  const dedup = [];
-  const seen = new Set();
-  for (const item of extracted) {
-    const itemKey = `${item.title}|${item.author}|${item.url}`;
-    if (!item.title || seen.has(itemKey)) continue;
-    seen.add(itemKey);
-    dedup.push(item);
-    if (dedup.length >= 20) break;
-  }
-
-  const payload = {
-    query: q,
-    count: dedup.length,
-    results: dedup,
-    source: 'fanqie',
-    debug: {
-      requestedUrl: url,
-      httpStatus: resp.status,
-      contentLength: html.length,
-      hasInitialState: Boolean(state),
-      stateSummary: summarizeState(state),
-      fallbackCount: extractFallback(html, q).length,
-    },
-  };
-  cache.set(cacheKey, { ts: Date.now(), data: payload });
-  return payload;
-}
-
-function serveStatic(res, filePath) {
-  readFile(filePath)
-    .then((buf) => {
-      const ext = path.extname(filePath).toLowerCase();
-      send(res, 200, buf, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-    })
-    .catch(() => text(res, 404, 'Not Found'));
-}
+await ensureStorage();
 
 const server = http.createServer(async (req, res) => {
-  const reqUrl = new URL(req.url, `http://${req.headers.host}`);
-  const ip = req.socket.remoteAddress || 'unknown';
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const pathname = decodeURIComponent(url.pathname);
 
-  if (req.method === 'OPTIONS') return json(res, 204, {});
-  if (rateLimited(ip)) return json(res, 429, { error: 'Too many requests' });
+  if (pathname.startsWith('/api/')) return handleApi(req, res, pathname);
+  if (pathname === '/' || pathname === '/index.html') return send(res, 200, renderPage(getUserFromReq(req)), { 'Content-Type': 'text/html; charset=utf-8' });
+  if (pathname === '/health') return text(res, 200, 'ok');
 
-  if (reqUrl.pathname === '/api/fanqie/search' && req.method === 'GET') {
-    try {
-      const query = reqUrl.searchParams.get('q') || '';
-      const data = await searchFanqie(query);
-      return json(res, 200, data);
-    } catch (error) {
-      return json(res, 500, { error: 'search_failed', message: error.message });
-    }
-  }
-
-  if (reqUrl.pathname === '/api/fanqie/debug' && req.method === 'GET') {
-    try {
-      const query = reqUrl.searchParams.get('q') || '';
-      const q = sanitizeQuery(query);
-      const url = q ? `https://fanqienovel.com/search/${encodeURIComponent(q)}` : 'https://fanqienovel.com/search/%E5%85%A8%E7%BD%91%E6%90%9C%E7%B4%A2';
-      const resp = await fetch(url, {
-        headers: {
-          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-          'accept-language': 'zh-CN,zh;q=0.9',
-          'referer': 'https://fanqienovel.com/',
-        },
-      });
-      const html = await resp.text();
-      const state = parseState(html);
-      return json(res, 200, {
-        requestedUrl: url,
-        httpStatus: resp.status,
-        contentLength: html.length,
-        hasInitialState: Boolean(state),
-        stateSummary: summarizeState(state),
-        sample: html.slice(0, 2000),
-      });
-    } catch (error) {
-      return json(res, 500, { error: 'debug_failed', message: error.message });
-    }
-  }
-
-  if (reqUrl.pathname === '/health') return text(res, 200, 'ok');
-
-  const safePath = path.normalize(decodeURIComponent(reqUrl.pathname)).replace(/^([.]{2}[\/])+/, '');
-  let filePath = path.join(ROOT, safePath);
-  try {
-    const stat = await import('node:fs/promises').then((m) => m.stat(filePath));
-    if (stat.isDirectory()) filePath = path.join(filePath, 'index.html');
-    return serveStatic(res, filePath);
-  } catch {
-    return serveStatic(res, path.join(ROOT, 'index.html'));
-  }
+  const safePath = path.normalize(pathname).replace(/^([.]{2}[\/])+/, '');
+  const filePath = path.join(ROOT, safePath);
+  return serveStatic(res, filePath);
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Fanqie site running at http://${HOST}:${PORT}`);
+  console.log(`Site running at http://${HOST}:${PORT}`);
 });
