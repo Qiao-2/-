@@ -1,4 +1,64 @@
-const state = window.__AUTH__ || { loggedIn: false, username: '', role: '', status: '' };
+const STORAGE_KEYS = {
+  users: 'fk_site_users',
+  session: 'fk_site_session',
+};
+
+function loadUsers() {
+  try {
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.users) || '[]');
+    return Array.isArray(users) ? users : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
+}
+
+function loadSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem(STORAGE_KEYS.session) || 'null');
+    return session && typeof session === 'object' ? session : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(session) {
+  localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session));
+}
+
+function clearSession() {
+  localStorage.removeItem(STORAGE_KEYS.session);
+}
+
+function ensureSeedData() {
+  const users = loadUsers();
+  if (!users.some((u) => u.role === 'admin')) {
+    users.push({
+      id: crypto.randomUUID(),
+      username: 'admin',
+      password: '123456',
+      role: 'admin',
+      status: 'approved',
+      createdAt: new Date().toISOString(),
+    });
+    saveUsers(users);
+  }
+}
+
+function getState() {
+  const session = loadSession();
+  const users = loadUsers();
+  const user = session ? users.find((u) => u.id === session.userId) : null;
+  return {
+    loggedIn: Boolean(user),
+    username: user?.username || '',
+    role: user?.role || '',
+    status: user?.status || '',
+  };
+}
 
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
@@ -16,18 +76,8 @@ function showMessage(text, type = 'info') {
   return el('div', { className: `msg ${type}`, text });
 }
 
-async function api(url, method = 'GET', body) {
-  const res = await fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || '请求失败');
-  return data;
-}
-
 function renderAuthCard() {
+  const state = getState();
   const card = document.getElementById('authCard');
   card.innerHTML = '';
 
@@ -47,8 +97,8 @@ function renderAuthCard() {
       el('button', {
         text: '退出登录',
         className: 'ghost',
-        onclick: async () => {
-          await api('/api/logout', 'POST');
+        onclick: () => {
+          clearSession();
           location.reload();
         },
       })
@@ -66,16 +116,19 @@ function renderAuthCard() {
     el('input', { placeholder: '密码', name: 'password', type: 'password', required: 'required' }),
     el('button', { text: '登录', className: 'primary', type: 'submit' })
   );
-  loginForm.addEventListener('submit', async (e) => {
+  loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    loginForm.querySelectorAll('.msg').forEach((n) => n.remove());
     const fd = new FormData(loginForm);
-    try {
-      await api('/api/login', 'POST', { username: fd.get('username'), password: fd.get('password') });
-      location.reload();
-    } catch (err) {
-      loginForm.querySelector('.notice')?.remove();
-      loginForm.append(showMessage(err.message, 'error'));
-    }
+    const username = String(fd.get('username') || '').trim();
+    const password = String(fd.get('password') || '').trim();
+    const users = loadUsers();
+    const user = users.find((u) => u.username === username);
+    if (!user) return loginForm.append(showMessage('账号不存在', 'error'));
+    if (user.password !== password) return loginForm.append(showMessage('密码错误', 'error'));
+    if (user.status !== 'approved' && user.role !== 'admin') return loginForm.append(showMessage('账号未通过审核，请等待管理员处理', 'error'));
+    saveSession({ userId: user.id });
+    location.reload();
   });
 
   const regForm = el('form', { className: 'panel' });
@@ -85,24 +138,34 @@ function renderAuthCard() {
     el('input', { placeholder: '密码', name: 'password', type: 'password', required: 'required' }),
     el('button', { text: '提交注册', className: 'primary', type: 'submit' })
   );
-  regForm.addEventListener('submit', async (e) => {
+  regForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    regForm.querySelectorAll('.msg').forEach((n) => n.remove());
     const fd = new FormData(regForm);
-    try {
-      const result = await api('/api/register', 'POST', { username: fd.get('username'), password: fd.get('password') });
-      regForm.querySelector('.notice')?.remove();
-      regForm.append(showMessage(result.message, 'success'));
-    } catch (err) {
-      regForm.querySelector('.notice')?.remove();
-      regForm.append(showMessage(err.message, 'error'));
-    }
+    const username = String(fd.get('username') || '').trim();
+    const password = String(fd.get('password') || '').trim();
+    if (!username || !password) return regForm.append(showMessage('用户名和密码不能为空', 'error'));
+    const users = loadUsers();
+    if (users.some((u) => u.username === username)) return regForm.append(showMessage('用户名已存在', 'error'));
+    users.push({
+      id: crypto.randomUUID(),
+      username,
+      password,
+      role: 'user',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+    saveUsers(users);
+    regForm.reset();
+    regForm.append(showMessage('注册成功，请等待管理员审核', 'success'));
   });
 
   formWrap.append(loginForm, regForm);
   card.append(title, formWrap);
 }
 
-async function renderDashboard() {
+function renderDashboard() {
+  const state = getState();
   const card = document.getElementById('dashboardCard');
   card.innerHTML = '';
   card.append(el('h2', { text: '内部页面' }));
@@ -115,49 +178,63 @@ async function renderDashboard() {
     const btn = el('button', { text: '打开审核后台', className: 'primary' });
     btn.onclick = async () => {
       document.getElementById('adminCard').classList.remove('hidden');
-      await renderAdmin();
+      renderAdmin();
     };
     card.append(btn);
   }
 }
 
-async function renderAdmin() {
+function renderAdmin() {
+  const state = getState();
   const card = document.getElementById('adminCard');
   card.innerHTML = '';
   card.append(el('h2', { text: '管理员审核后台' }));
-  const list = el('div', { className: 'user-list', text: '加载中…' });
-  card.append(list);
-  const data = await api('/api/admin/users');
-  list.innerHTML = '';
-  if (!data.users.length) {
-    list.append(el('p', { text: '暂无待审核用户。' }));
+
+  if (state.role !== 'admin') {
+    card.append(el('p', { text: '你没有权限访问后台。' }));
     return;
   }
-  data.users.forEach((u) => {
-    const row = el('div', { className: 'user-row' });
-    row.append(
-      el('div', {}, [el('strong', { text: u.username }), el('div', { text: `${u.status} · ${new Date(u.createdAt).toLocaleString()}` })]),
-      el('div', { className: 'row-actions' }, [
-        el('button', {
-          text: '通过',
-          className: 'primary',
-          onclick: async () => {
-            await api('/api/admin/review', 'POST', { userId: u.id, status: 'approved' });
-            renderAdmin();
-          },
-        }),
-        el('button', {
-          text: '拒绝',
-          className: 'ghost',
-          onclick: async () => {
-            await api('/api/admin/review', 'POST', { userId: u.id, status: 'rejected' });
-            renderAdmin();
-          },
-        }),
-      ])
-    );
-    list.append(row);
-  });
+
+  const list = el('div', { className: 'user-list' });
+  const users = loadUsers().filter((u) => u.role !== 'admin');
+
+  if (!users.length) {
+    list.append(el('p', { text: '暂无待审核用户。' }));
+  } else {
+    users.forEach((u) => {
+      const row = el('div', { className: 'user-row' });
+      row.append(
+        el('div', {}, [el('strong', { text: u.username }), el('div', { text: `${u.status} · ${new Date(u.createdAt).toLocaleString()}` })]),
+        el('div', { className: 'row-actions' }, [
+          el('button', {
+            text: '通过',
+            className: 'primary',
+            onclick: () => {
+              const all = loadUsers();
+              const target = all.find((x) => x.id === u.id);
+              if (target) target.status = 'approved';
+              saveUsers(all);
+              renderAdmin();
+            },
+          }),
+          el('button', {
+            text: '拒绝',
+            className: 'ghost',
+            onclick: () => {
+              const all = loadUsers();
+              const target = all.find((x) => x.id === u.id);
+              if (target) target.status = 'rejected';
+              saveUsers(all);
+              renderAdmin();
+            },
+          }),
+        ])
+      );
+      list.append(row);
+    });
+  }
+
+  card.append(list);
 }
 
 function injectStyles() {
@@ -176,6 +253,8 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
+ensureSeedData();
 injectStyles();
 renderAuthCard();
+const state = getState();
 if (state.loggedIn) renderDashboard();
